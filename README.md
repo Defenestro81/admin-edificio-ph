@@ -1,16 +1,12 @@
 # Administración de Edificio — Guía de instalación
 
-> ## ⚠️ Pensado para uso local únicamente
+> ## ⚠️ Pensado para uso local
 >
-> **Los endpoints de `api/` no tienen ningún tipo de autenticación** y envían
-> `Access-Control-Allow-Origin: *`. Cualquiera que alcance el servidor puede
-> leer y modificar expensas, unidades y caja sin credenciales. En particular,
-> `api/backup.php` responde a un GET con un volcado completo de la base,
-> incluidos los nombres y correos de los propietarios.
->
-> Esto es aceptable corriendo en `localhost` detrás de XAMPP, que es el escenario
-> para el que fue escrito. **No lo publiques en un hosting accesible desde
-> internet sin agregarle antes una capa de autenticación.**
+> Todos los endpoints de `api/` exigen sesión iniciada, pero el sistema está
+> pensado para correr en `localhost` detrás de XAMPP. Si lo ponés en un hosting
+> accesible desde internet, antes revisá como mínimo: servirlo por **HTTPS**
+> (las contraseñas viajan en texto plano sobre HTTP), y que el `.htaccess` esté
+> siendo respetado por el servidor.
 
 > **Nota sobre los iconos:** los favicons y los iconos de la PWA no están en el
 > repositorio porque son fotos del edificio real. Si clonás el proyecto vas a ver
@@ -49,9 +45,12 @@ edificio/
 │   ├── cuenta_corriente.php
 │   ├── exportar_caja.php
 │   ├── exportar_cuenta_corriente.php
-│   └── backup.php
+│   ├── backup.php
+│   └── auth.php          ← login, logout y cambio de contraseña
 ├── includes/
-│   └── config.php        ← lee el .env, no hay que editarlo
+│   ├── config.php        ← lee el .env, no hay que editarlo
+│   ├── auth.php          ← sesión y protección de endpoints
+│   └── migraciones.php   ← esquema de la base, versionado
 ├── Deploy base de datos/
 │   ├── database.sql
 │   └── migracion_liquidacion_extraordinaria.sql
@@ -100,7 +99,26 @@ MAIL_FROM_NAME="Administración del Edificio"
 Si un valor tiene espacios o caracteres especiales, encerralo entre comillas
 dobles. `includes/config.php` lee este archivo y no hay que editarlo.
 
-## 5. Contraseña de aplicación de Gmail
+## 5. Primer ingreso
+
+Abrí `http://localhost/edificio/`. Como todavía no hay ningún usuario, la app te
+muestra la pantalla de **alta inicial**: cargás tu nombre, un usuario y una
+contraseña (mínimo 8 caracteres) y entrás directo.
+
+Esa vía de alta queda cerrada apenas existe el primer usuario, así que nadie más
+puede crearse una cuenta desde afuera. Después podés cambiar tu contraseña desde
+**Sistema → Mi Cuenta**.
+
+Si te olvidás la contraseña, no hay recuperación por mail: se resetea borrando la
+fila de la tabla `usuarios` desde phpMyAdmin, lo que vuelve a habilitar la
+pantalla de alta inicial.
+
+**Protecciones incluidas:** las contraseñas se guardan con `password_hash()`
+(bcrypt, nunca en texto plano), la cookie de sesión es `HttpOnly` + `SameSite=Strict`,
+la sesión se cierra sola tras 8 horas de inactividad, y la cuenta se bloquea 15
+minutos después de 5 intentos fallidos seguidos.
+
+## 6. Contraseña de aplicación de Gmail
 
 Para que Gmail permita el envío desde PHP:
 
@@ -110,14 +128,14 @@ Para que Gmail permita el envío desde PHP:
 4. Seleccioná "Otra (nombre personalizado)" → escribí "Edificio"
 5. Google te da una clave de 16 caracteres → copiala en `MAIL_PASS` del `.env`
 
-## 6. Usar el sistema
+## 7. Usar el sistema
 
 Abrí el navegador y entrá a:
 ```
 http://localhost/edificio
 ```
 
-## 7. Backup y restauración
+## 8. Backup y restauración
 
 Desde la sección **Sistema → Backup** de la app podés:
 

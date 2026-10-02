@@ -13,11 +13,63 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+
+<!-- ─── Pantalla de acceso ─────────────────────────────────────────────────
+     Tapa la app hasta que haya sesión. Tiene dos modos: alta del primer
+     usuario (instalación nueva) e inicio de sesión. -->
+<div id="auth-overlay" class="auth-overlay">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <h1>Admin Edificio</h1>
+      <p id="auth-sub">Ingresá para continuar</p>
+    </div>
+
+    <!-- Modo: iniciar sesión -->
+    <form id="auth-login" class="auth-form" onsubmit="hacerLogin(event)">
+      <div class="form-group">
+        <label class="form-label" for="login-usuario">Usuario</label>
+        <input class="form-control" id="login-usuario" autocomplete="username" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="login-password">Contraseña</label>
+        <input class="form-control" id="login-password" type="password" autocomplete="current-password" required>
+      </div>
+      <div id="login-error" class="alert alert-danger" hidden></div>
+      <button class="btn btn-primary btn-lg auth-submit" type="submit" id="login-btn">Ingresar</button>
+    </form>
+
+    <!-- Modo: crear el primer usuario -->
+    <form id="auth-setup" class="auth-form" onsubmit="crearPrimerUsuario(event)" hidden>
+      <div class="alert alert-info">Esta instalación todavía no tiene usuarios. Creá el primero para poder entrar.</div>
+      <div class="form-group">
+        <label class="form-label" for="setup-nombre">Tu nombre</label>
+        <input class="form-control" id="setup-nombre" autocomplete="name" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="setup-usuario">Usuario</label>
+        <input class="form-control" id="setup-usuario" autocomplete="username" required
+               placeholder="letras, números, punto, guion">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="setup-password">Contraseña</label>
+        <input class="form-control" id="setup-password" type="password" autocomplete="new-password" required
+               placeholder="mínimo 8 caracteres">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="setup-password2">Repetir contraseña</label>
+        <input class="form-control" id="setup-password2" type="password" autocomplete="new-password" required>
+      </div>
+      <div id="setup-error" class="alert alert-danger" hidden></div>
+      <button class="btn btn-primary btn-lg auth-submit" type="submit" id="setup-btn">Crear usuario y entrar</button>
+    </form>
+  </div>
+</div>
+
 <div class="app">
   <aside class="sidebar">
     <div class="sidebar-logo">
       <h1>Admin<br>Edificio</h1>
-      <p><?php echo NombreEdificio; ></p>
+      <p id="sidebar-sub"></p>
     </div>
     <div class="nav-section">
       <div class="nav-label">General</div>
@@ -43,6 +95,12 @@
     <div class="nav-section">
       <div class="nav-label">Sistema</div>
       <div class="nav-item" onclick="navigate('backup')"><span class="nav-icon">◧</span> Backup</div>
+      <div class="nav-item" onclick="navigate('cuenta')"><span class="nav-icon">◉</span> Mi Cuenta</div>
+    </div>
+
+    <div class="sidebar-footer">
+      <span id="sidebar-usuario" class="sidebar-usuario"></span>
+      <button class="btn btn-ghost btn-sm" onclick="cerrarSesion()" title="Cerrar sesión">Salir</button>
     </div>
   </aside>
 
@@ -323,6 +381,41 @@
         </div>
       </div>
 
+      <!-- MI CUENTA -->
+      <div id="page-cuenta" class="page">
+        <div class="card" style="max-width:520px">
+          <div class="card-title">◉ Mi cuenta</div>
+          <div class="form-group">
+            <label class="form-label">Usuario</label>
+            <input class="form-control" id="cuenta-usuario" disabled>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nombre</label>
+            <input class="form-control" id="cuenta-nombre" disabled>
+          </div>
+        </div>
+
+        <div class="card" style="max-width:520px">
+          <div class="card-title">🔑 Cambiar contraseña</div>
+          <form onsubmit="cambiarPassword(event)">
+            <div class="form-group">
+              <label class="form-label" for="pass-actual">Contraseña actual</label>
+              <input class="form-control" id="pass-actual" type="password" autocomplete="current-password" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="pass-nueva">Contraseña nueva</label>
+              <input class="form-control" id="pass-nueva" type="password" autocomplete="new-password" required
+                     placeholder="mínimo 8 caracteres">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="pass-nueva2">Repetir contraseña nueva</label>
+              <input class="form-control" id="pass-nueva2" type="password" autocomplete="new-password" required>
+            </div>
+            <button class="btn btn-primary" type="submit">Cambiar contraseña</button>
+          </form>
+        </div>
+      </div>
+
     </div>
   </main>
 </div>
@@ -536,9 +629,17 @@
 const API = 'api';
 
 async function api(endpoint, method='GET', body=null) {
-  const opts = { method, headers: {'Content-Type':'application/json'} };
+  const opts = { method, headers: {'Content-Type':'application/json'}, credentials:'same-origin' };
   if (body) opts.body = JSON.stringify(body);
   const r = await fetch(`${API}/${endpoint}`, opts);
+
+  // Sesión vencida o inexistente: volvemos a la pantalla de acceso en vez de
+  // dejar que el error burbujee como un fallo cualquiera.
+  if (r.status === 401) {
+    mostrarLogin();
+    throw new Error('Sesión expirada');
+  }
+
   const data = await r.json();
   if (!data.ok) throw new Error(data.error || 'Error');
   return data.data;
@@ -549,6 +650,139 @@ function toast(msg, type='ok') {
   t.textContent = msg;
   t.className = `toast ${type} show`;
   setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Sesión
+// ═══════════════════════════════════════════════════════════════
+
+let usuarioActual = null;
+
+/** Llama a auth.php sin pasar por api(), que redirige al login ante un 401. */
+async function authFetch(method, body=null) {
+  const opts = { method, headers: {'Content-Type':'application/json'}, credentials:'same-origin' };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch('api/auth.php', opts);
+  return r.json();
+}
+
+function mostrarLogin(sub='Ingresá para continuar') {
+  usuarioActual = null;
+  document.getElementById('auth-sub').textContent = sub;
+  document.getElementById('auth-login').hidden = false;
+  document.getElementById('auth-setup').hidden = true;
+  document.getElementById('auth-overlay').hidden = false;
+  document.getElementById('login-password').value = '';
+  document.getElementById('login-usuario').focus();
+}
+
+function mostrarSetup() {
+  document.getElementById('auth-sub').textContent = 'Primer uso';
+  document.getElementById('auth-login').hidden = true;
+  document.getElementById('auth-setup').hidden = false;
+  document.getElementById('auth-overlay').hidden = false;
+  document.getElementById('setup-nombre').focus();
+}
+
+function mostrarApp(usuario) {
+  usuarioActual = usuario;
+  document.getElementById('auth-overlay').hidden = true;
+  document.getElementById('sidebar-usuario').textContent = usuario.nombre;
+  document.getElementById('sidebar-usuario').title = `Conectado como ${usuario.usuario}`;
+}
+
+function errorAuth(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.hidden = false;
+}
+
+async function hacerLogin(ev) {
+  ev.preventDefault();
+  const btn = document.getElementById('login-btn');
+  document.getElementById('login-error').hidden = true;
+  btn.disabled = true;
+  btn.textContent = 'Ingresando…';
+
+  try {
+    const r = await authFetch('POST', {
+      accion:   'login',
+      usuario:  document.getElementById('login-usuario').value,
+      password: document.getElementById('login-password').value,
+    });
+    if (!r.ok) { errorAuth('login-error', r.error); return; }
+
+    mostrarApp(r.data.usuario);
+    await iniciarApp();
+  } catch (e) {
+    errorAuth('login-error', 'No se pudo conectar con el servidor');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Ingresar';
+    document.getElementById('login-password').value = '';
+  }
+}
+
+async function crearPrimerUsuario(ev) {
+  ev.preventDefault();
+  const btn = document.getElementById('setup-btn');
+  document.getElementById('setup-error').hidden = true;
+
+  const pass  = document.getElementById('setup-password').value;
+  const pass2 = document.getElementById('setup-password2').value;
+  if (pass !== pass2) { errorAuth('setup-error', 'Las contraseñas no coinciden'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Creando…';
+  try {
+    const r = await authFetch('POST', {
+      accion:   'crear_primero',
+      nombre:   document.getElementById('setup-nombre').value,
+      usuario:  document.getElementById('setup-usuario').value,
+      password: pass,
+    });
+    if (!r.ok) { errorAuth('setup-error', r.error); return; }
+
+    mostrarApp(r.data.usuario);
+    await iniciarApp();
+    toast('Usuario creado. ¡Bienvenido!');
+  } catch (e) {
+    errorAuth('setup-error', 'No se pudo conectar con el servidor');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Crear usuario y entrar';
+  }
+}
+
+async function cerrarSesion() {
+  try { await authFetch('DELETE'); } catch (e) {}
+  mostrarLogin('Cerraste sesión');
+}
+
+async function cambiarPassword(ev) {
+  ev.preventDefault();
+  const nueva  = document.getElementById('pass-nueva').value;
+  const nueva2 = document.getElementById('pass-nueva2').value;
+  if (nueva !== nueva2) { toast('Las contraseñas nuevas no coinciden', 'err'); return; }
+
+  try {
+    const r = await authFetch('PUT', {
+      actual: document.getElementById('pass-actual').value,
+      nueva:  nueva,
+    });
+    if (!r.ok) { toast(r.error, 'err'); return; }
+
+    ['pass-actual','pass-nueva','pass-nueva2'].forEach(id => document.getElementById(id).value = '');
+    toast('Contraseña actualizada');
+  } catch (e) {
+    toast('No se pudo conectar con el servidor', 'err');
+  }
+}
+
+function renderCuenta() {
+  if (!usuarioActual) return;
+  document.getElementById('cuenta-usuario').value = usuarioActual.usuario;
+  document.getElementById('cuenta-nombre').value  = usuarioActual.nombre;
 }
 
 let unidades = [];
@@ -567,6 +801,7 @@ const pageTitles = {
   caja:['Caja','Ingresos y egresos del edificio'],
   cuenta_corriente:['Cuenta Corriente','Estado de cuenta por unidad'],
   backup:['Backup','Exportar e importar la base de datos'],
+  cuenta:['Mi Cuenta','Datos de acceso y contraseña'],
 };
 
 function setupYearSelector(prefix) {
@@ -649,6 +884,7 @@ async function navigate(page) {
   else if (page==='caja') initCaja();
   else if (page==='cuenta_corriente') { setupYearSelector('cc'); renderCuentaCorriente(); }
   else if (page==='backup') initBackup();
+  else if (page==='cuenta') renderCuenta();
 }
 
 // ── Dashboard ──
@@ -1642,19 +1878,38 @@ function importBackup() {
 }
 
 // ── Init ──
-(async()=>{
-  unidades=await api('unidades.php');
-  
+
+/** Carga los datos y deja la app lista. Se llama recién con sesión abierta. */
+async function iniciarApp() {
+  unidades = await api('unidades.php');
+
   // Poblar selector de unidades en cuenta corriente
   const ccUnidadSelect = document.getElementById('cc-unidad');
+  ccUnidadSelect.innerHTML = '';   // se vacía primero por si se reingresa
   unidades.forEach(u => {
     const opt = document.createElement('option');
     opt.value = u.id;
     opt.textContent = u.nombre;
     ccUnidadSelect.appendChild(opt);
   });
-  
+
   renderDashboard();
+}
+
+/** Decide qué mostrar al abrir la página: alta inicial, login o la app. */
+(async () => {
+  try {
+    const r = await authFetch('GET');
+    const d = r.data;
+
+    if (!d.hay_usuarios)   { mostrarSetup(); return; }
+    if (!d.autenticado)    { mostrarLogin(); return; }
+
+    mostrarApp(d.usuario);
+    await iniciarApp();
+  } catch (e) {
+    mostrarLogin('No se pudo contactar al servidor');
+  }
 })();
 </script>
 </body>

@@ -121,3 +121,24 @@
   .backup-dropzone:hover,.backup-dropzone.drag-over{border-color:var(--accent);background:#2a200a;color:var(--text)}
   .backup-dropzone.has-file{border-style:solid;border-color:var(--success);background:#0f2a1a;pointer-events:none}
   .btn-danger:disabled{opacity:.4;cursor:not-allowed}
+
+  /* El atributo hidden lo pisan las reglas que fijan display (.alert usa flex),
+     así que se refuerza acá. Sin esto, los avisos de error aparecen vacíos. */
+  [hidden]{display:none!important}
+
+  /* ─── Pantalla de acceso ─── */
+  /* Arranca visible y tapando todo: si el JS fallara, la app queda cubierta
+     en lugar de quedar a la vista sin sesión. */
+  .auth-overlay{position:fixed;inset:0;z-index:500;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px}
+  .auth-overlay[hidden]{display:none}
+  .auth-box{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:32px}
+  .auth-logo{text-align:center;margin-bottom:28px}
+  .auth-logo h1{font-family:'DM Serif Display',serif;font-size:24px;color:var(--accent);line-height:1.2}
+  .auth-logo p{font-size:12px;color:var(--text3);margin-top:6px;font-family:'DM Mono',monospace;letter-spacing:.05em}
+  .auth-form[hidden]{display:none}
+  .auth-submit{width:100%;justify-content:center;margin-top:4px}
+  .alert-danger{background:#2a0f0f;color:var(--danger);border:1px solid var(--danger)}
+
+  /* ─── Pie de la barra lateral (usuario + salir) ─── */
+  .sidebar-footer{margin-top:auto;padding:14px 20px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .sidebar-usuario{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

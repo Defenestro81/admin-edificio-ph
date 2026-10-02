@@ -49,6 +49,12 @@ foreach (['DB_USER', 'DB_PASS', 'DB_NAME', 'MAIL_USER', 'MAIL_PASS', 'MAIL_FROM'
     }
 }
 
+// ─── Zona horaria ───
+// XAMPP viene con date.timezone en Europe/Berlin, que no coincide con el reloj
+// de MySQL ni con el del navegador. Fijarla acá evita que las fechas generadas
+// por PHP queden corridas respecto de las de la base.
+date_default_timezone_set(env('TZ', 'America/Argentina/Buenos_Aires'));
+
 // ─── Base de datos ───
 define('DB_HOST', env('DB_HOST', 'localhost'));
 define('DB_USER', env('DB_USER'));
@@ -110,3 +116,7 @@ function plantillaMail(): array {
     $row = db()->query('SELECT asunto, saludo, intro, footer, firma FROM plantilla_mail WHERE id = 1')->fetch();
     return $row ?: plantillaMailDefault();
 }
+
+// ─── Autenticación ───
+// Va al final, cuando db() y json_err() ya están definidas.
+require_once __DIR__ . '/auth.php';
