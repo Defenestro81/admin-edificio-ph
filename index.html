@@ -1,0 +1,1661 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Administración de Edificio</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="/edificio/favicon-96x96.png" sizes="96x96" />
+<link rel="icon" type="image/svg+xml" href="/edificio/favicon.svg" />
+<link rel="shortcut icon" href="/edificio/favicon.ico" />
+<link rel="apple-touch-icon" sizes="180x180" href="/edificio/apple-touch-icon.png" />
+<link rel="manifest" href="/edificio/site.webmanifest" />
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <h1>Admin<br>Edificio</h1>
+      <p><?php echo NombreEdificio; ></p>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">General</div>
+      <div class="nav-item active" onclick="navigate('dashboard')"><span class="nav-icon">◈</span> Dashboard</div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Estructura</div>
+      <div class="nav-item" onclick="navigate('unidades')"><span class="nav-icon">⬡</span> Unidades</div>
+      <div class="nav-item" onclick="navigate('gastos_fijos')"><span class="nav-icon">⊕</span> Gastos Fijos</div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Dinero</div>
+      <div class="nav-item" onclick="navigate('caja')"><span class="nav-icon">◑</span> Caja</div>
+      <div class="nav-item" onclick="navigate('cuenta_corriente')"><span class="nav-icon">≡</span> Cta. Corriente</div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Liquidación</div>
+      <div class="nav-item" onclick="navigate('gastos_periodo')"><span class="nav-icon">◎</span> Gastos del Período</div>
+      <div class="nav-item" onclick="navigate('liquidacion')"><span class="nav-icon">◻</span> Liquidación</div>
+      <div class="nav-item" onclick="navigate('enviar')"><span class="nav-icon">✉</span> Enviar Mails</div>
+      <div class="nav-item" onclick="navigate('plantilla_mail')"><span class="nav-icon">✎</span> Plantilla Mail</div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Sistema</div>
+      <div class="nav-item" onclick="navigate('backup')"><span class="nav-icon">◧</span> Backup</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h2 id="page-title">Dashboard</h2>
+        <div class="topbar-sub" id="page-sub">Resumen del edificio</div>
+      </div>
+      <div id="topbar-actions"></div>
+    </div>
+    <div class="content">
+
+      <!-- DASHBOARD -->
+      <div id="page-dashboard" class="page active">
+        <div class="grid-3" style="margin-bottom:24px">
+          <div class="stat-card"><div class="stat-label">Unidades</div><div class="stat-value" id="stat-unidades">—</div><div class="stat-sub">registradas</div></div>
+          <div class="stat-card"><div class="stat-label">Gastos Fijos</div><div class="stat-value" id="stat-gastos">—</div><div class="stat-sub">activos</div></div>
+          <div class="stat-card"><div class="stat-label">Suma Coeficientes</div><div class="stat-value" id="stat-coef">—</div><div class="stat-sub">debe ser 1.0000</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📋 Unidades del edificio</div>
+          <div class="table-wrap">
+            <table><thead><tr><th>Unidad</th><th>Propietario</th><th>Email</th><th>Coeficiente</th><th>Barra</th></tr></thead>
+            <tbody id="dash-units-table"></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- UNIDADES -->
+      <div id="page-unidades" class="page">
+        <div class="alert alert-info">ℹ️ La suma de coeficientes debe ser exactamente <strong>1.0000</strong>.</div>
+        <div class="card">
+          <div class="section-header">
+            <div class="section-title">Unidades registradas</div>
+            <div style="display:flex;align-items:center;gap:12px">
+              <div class="coef-sum-badge coef-ok" id="coef-badge">Σ = 0.0000</div>
+              <button class="btn btn-primary btn-sm" onclick="openModalUnidad()">+ Nueva unidad</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table><thead><tr><th>Nombre</th><th>Propietario</th><th>Email</th><th>Coeficiente</th><th>Ascensor</th><th>Acciones</th></tr></thead>
+            <tbody id="unidades-table"></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- GASTOS FIJOS -->
+      <div id="page-gastos_fijos" class="page">
+        <div class="alert alert-info">ℹ️ Los gastos fijos se incluyen en todos los períodos.</div>
+        <div class="card">
+          <div class="section-header">
+            <div class="section-title">Gastos fijos configurados</div>
+            <button class="btn btn-primary btn-sm" onclick="openModalGastoFijo()">+ Nuevo gasto fijo</button>
+          </div>
+          <div class="table-wrap">
+            <table><thead><tr><th>Concepto</th><th>Importe</th><th>División</th><th>Aplica a</th><th>Acciones</th></tr></thead>
+            <tbody id="gastos-fijos-table"></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- GASTOS PERÍODO -->
+      <div id="page-gastos_periodo" class="page">
+        <div class="period-row">
+          <select class="form-control" id="period-year" style="width:90px"></select>
+          <select class="form-control" id="period-month" style="width:140px">
+            <option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option>
+            <option value="04">Abril</option><option value="05">Mayo</option><option value="06">Junio</option>
+            <option value="07">Julio</option><option value="08">Agosto</option><option value="09">Septiembre</option>
+            <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="loadPeriod()">Cargar</button>
+          <div class="period-display" id="period-label">—</div>
+        </div>
+        <div id="periodo-content" style="display:none">
+          <div id="liq-warning" class="alert alert-warning" style="display:none">⚠️ Ya existe una liquidación. Agregar gastos la <strong>eliminará</strong> y deberás recalcular.</div>
+          <div class="card">
+            <div class="section-header">
+              <div class="section-title">Gastos esporádicos del período</div>
+              <button class="btn btn-primary btn-sm" onclick="openModalGastoEsporadico()">+ Agregar gasto</button>
+            </div>
+            <div class="table-wrap">
+              <table><thead><tr><th>Concepto</th><th>Importe</th><th>División</th><th>Aplica a</th><th>Acciones</th></tr></thead>
+              <tbody id="gastos-esporadicos-table"></tbody></table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LIQUIDACIÓN -->
+      <div id="page-liquidacion" class="page">
+        <div class="period-row">
+          <select class="form-control" id="liq-year" style="width:90px"></select>
+          <select class="form-control" id="liq-month" style="width:140px">
+            <option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option>
+            <option value="04">Abril</option><option value="05">Mayo</option><option value="06">Junio</option>
+            <option value="07">Julio</option><option value="08">Agosto</option><option value="09">Septiembre</option>
+            <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="calcularLiquidacion()">⚙ Calcular liquidación</button>
+          <button class="btn btn-danger btn-sm" id="btn-borrar-liq" style="display:none" onclick="borrarLiquidacion()">✕ Borrar</button>
+        </div>
+        <div id="liq-content"></div>
+
+        <div class="card" style="margin-top:20px">
+          <div class="section-header">
+            <div class="section-title">Liquidaciones extraordinarias</div>
+            <button class="btn btn-secondary btn-sm" onclick="openModalExtraordinaria()">+ Nueva extraordinaria</button>
+          </div>
+          <div id="ex-lista"></div>
+        </div>
+      </div>
+
+      <!-- ENVIAR -->
+      <div id="page-enviar" class="page">
+        <div class="period-row">
+          <select class="form-control" id="mail-year" style="width:90px"></select>
+          <select class="form-control" id="mail-month" style="width:140px">
+            <option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option>
+            <option value="04">Abril</option><option value="05">Mayo</option><option value="06">Junio</option>
+            <option value="07">Julio</option><option value="08">Agosto</option><option value="09">Septiembre</option>
+            <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="loadMailPeriod()">Cargar</button>
+        </div>
+        <div id="mail-content"></div>
+      </div>
+
+      <!-- PLANTILLA MAIL -->
+      <div id="page-plantilla_mail" class="page">
+        <div class="alert alert-info">ℹ️ Este texto se usa como base para armar el mail de cada unidad. Podés usar <strong>{nombre}</strong> (propietario), <strong>{unidad}</strong> y <strong>{periodo}</strong>, que se reemplazan automáticamente. El contenido de cada mail también se puede editar a mano antes de enviarlo.</div>
+        <div class="card">
+          <div class="card-title">✎ Texto fijo del mail</div>
+          <div class="form-group"><label class="form-label">Asunto</label><input class="form-control" id="pm-asunto" placeholder="Expensas {periodo} - {unidad}"></div>
+          <div class="form-group"><label class="form-label">Saludo</label><input class="form-control" id="pm-saludo" placeholder="Estimado/a {nombre},"></div>
+          <div class="form-group"><label class="form-label">Introducción</label><textarea class="form-control" id="pm-intro" rows="3"></textarea></div>
+          <div class="form-group"><label class="form-label">Texto antes de la firma</label><textarea class="form-control" id="pm-footer" rows="3"></textarea></div>
+          <div class="form-group"><label class="form-label">Firma</label><textarea class="form-control" id="pm-firma" rows="3"></textarea></div>
+          <div style="display:flex;gap:10px;margin-top:8px">
+            <button class="btn btn-primary" onclick="guardarPlantillaMail()">Guardar</button>
+            <button class="btn btn-secondary" onclick="restaurarPlantillaMail()">Restaurar predeterminado</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CAJA -->
+      <div id="page-caja" class="page">
+        <div class="card">
+          <div class="section-header">
+            <div class="section-title">Movimientos de caja</div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-secondary btn-sm" onclick="exportarCaja()">📊 Exportar a Excel</button>
+              <button class="btn btn-primary btn-sm" onclick="openModalMovimiento()">+ Nuevo movimiento</button>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-end">
+            <div style="display:flex;flex-direction:column">
+              <label class="form-label" for="caja-filter-buscar">Descripción</label>
+              <input type="text" class="form-control" id="caja-filter-buscar" placeholder="🔍 Buscar por descripción…" style="width:240px" oninput="cajaBuscarInput()">
+            </div>
+            <div style="display:flex;flex-direction:column">
+              <label class="form-label" for="caja-filter-tipo">Tipo</label>
+              <select class="form-control" id="caja-filter-tipo" style="width:160px" onchange="cajaPagina=1;renderCaja()">
+                <option value="">Todos</option>
+                <option value="ingreso">Solo ingresos</option>
+                <option value="egreso">Solo egresos</option>
+              </select>
+            </div>
+            <div style="display:flex;flex-direction:column">
+              <label class="form-label" for="caja-filter-year">Año</label>
+              <select class="form-control" id="caja-filter-year" style="width:90px" onchange="cajaPagina=1;renderCaja()"></select>
+            </div>
+            <div style="display:flex;flex-direction:column">
+              <label class="form-label" for="caja-filter-month">Mes</label>
+              <select class="form-control" id="caja-filter-month" style="width:140px" onchange="cajaPagina=1;renderCaja()">
+                <option value="">Todos los meses</option>
+                <option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option>
+                <option value="04">Abril</option><option value="05">Mayo</option><option value="06">Junio</option>
+                <option value="07">Julio</option><option value="08">Agosto</option><option value="09">Septiembre</option>
+                <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid-3" style="margin-bottom:20px">
+            <div class="stat-card"><div class="stat-label">Saldo actual del fondo</div><div class="stat-value" id="caja-saldo" style="font-size:22px">—</div></div>
+            <div class="stat-card"><div class="stat-label">Ingresos del período</div><div class="stat-value" id="caja-ingresos" style="font-size:22px;color:var(--success)">—</div></div>
+            <div class="stat-card"><div class="stat-label">Egresos del período</div><div class="stat-value" id="caja-egresos" style="font-size:22px;color:var(--danger)">—</div></div>
+          </div>
+          <div class="table-wrap">
+            <table><thead><tr><th>Fecha</th><th>Concepto</th><th>Unidad</th><th>Tipo</th><th>Importe</th><th></th></tr></thead>
+            <tbody id="caja-table"></tbody></table>
+          </div>
+          <div id="caja-paginacion" style="margin-top:16px;text-align:center"></div>
+        </div>
+      </div>
+
+      <!-- CUENTA CORRIENTE -->
+      <div id="page-cuenta_corriente" class="page">
+        <div class="card" style="margin-bottom:20px">
+          <div class="section-header">
+            <div class="section-title">Vista por unidad</div>
+          </div>
+          <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap">
+            <select class="form-control" id="cc-unidad" style="width:200px" onchange="renderCuentaCorrienteUnidad()">
+              <option value="">Seleccionar unidad...</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" id="btn-exportar-cc" onclick="exportarCuentaCorrienteUnidad()" style="display:none">📊 Exportar a Excel</button>
+          </div>
+          <div id="cc-unidad-content"></div>
+        </div>
+        
+        <div class="period-row">
+          <select class="form-control" id="cc-year" style="width:90px"></select>
+          <select class="form-control" id="cc-month" style="width:140px">
+            <option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option>
+            <option value="04">Abril</option><option value="05">Mayo</option><option value="06">Junio</option>
+            <option value="07">Julio</option><option value="08">Agosto</option><option value="09">Septiembre</option>
+            <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="renderCuentaCorriente()">Cargar</button>
+        </div>
+        <div id="cc-content"></div>
+      </div>
+
+      <!-- BACKUP -->
+      <div id="page-backup" class="page">
+        <div class="alert alert-info" style="margin-bottom:24px">
+          ℹ Mantené copias periódicas de tu base de datos. El archivo generado incluye estructura y datos completos.
+        </div>
+        <div class="grid-2">
+
+          <!-- Exportar -->
+          <div class="card">
+            <div class="card-title">⬇ Exportar base de datos</div>
+            <p style="color:var(--text2);font-size:13px;line-height:1.7;margin-bottom:20px">
+              Descargá un archivo <strong>.sql</strong> con la estructura y todos los datos actuales.
+              Podés usarlo para hacer un respaldo o migrar la base a otro servidor.
+            </p>
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:24px">
+              <div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Tablas incluidas</div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px">
+                <span class="tag">unidades</span>
+                <span class="tag">gastos_fijos</span>
+                <span class="tag">gastos_fijos_unidades</span>
+                <span class="tag">gastos_esporadicos</span>
+                <span class="tag">gastos_esporadicos_unidades</span>
+                <span class="tag">liquidaciones</span>
+                <span class="tag">liquidacion_detalle</span>
+                <span class="tag">liquidacion_lineas</span>
+                <span class="tag">caja</span>
+                <span class="tag">cuenta_corriente</span>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-lg" style="width:100%;justify-content:center" onclick="exportBackup()">
+              ⬇ Descargar backup (.sql)
+            </button>
+          </div>
+
+          <!-- Restaurar -->
+          <div class="card" style="border-color:#4a1f1f">
+            <div class="card-title">⬆ Restaurar base de datos</div>
+            <div class="alert alert-danger" style="margin-bottom:20px">
+              ⚠ <strong>Atención: Restaurar reemplaza toda la base de datos actual con el archivo seleccionado. Esta acción no se puede deshacer.</strong>
+            </div>
+            <div class="backup-dropzone" id="backup-dropzone" onclick="document.getElementById('backup-file').click()">
+              <div style="font-size:36px;line-height:1;margin-bottom:10px">📂</div>
+              <div style="font-size:14px;font-weight:500;color:var(--text);margin-bottom:4px">Seleccionar archivo .sql</div>
+              <div style="font-size:12px;color:var(--text3)">o arrastrá y soltá aquí</div>
+              <input type="file" id="backup-file" accept=".sql" style="display:none" onchange="onBackupFileSelect(event)">
+            </div>
+            <div id="backup-file-info" style="display:none;align-items:center;gap:10px;margin-top:12px;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius)"></div>
+            <button class="btn btn-danger btn-lg" id="btn-import-backup" style="width:100%;justify-content:center;margin-top:16px" onclick="importBackup()" disabled>
+              ⬆ Restaurar backup
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- MODAL MOVIMIENTO -->
+<div class="modal-overlay" id="modal-movimiento">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Nuevo movimiento</div><button class="btn btn-ghost" onclick="closeModal('modal-movimiento')">✕</button></div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Fecha *</label><input class="form-control" id="mov-fecha" type="date"></div>
+        <div class="form-group">
+          <label class="form-label">Tipo *</label>
+          <div class="radio-group" id="mov-tipo-group">
+            <label class="radio-item selected" onclick="selectRadio('mov-tipo-group',this);toggleUnidadField()"><input type="radio" value="ingreso" checked> Ingreso</label>
+            <label class="radio-item" onclick="selectRadio('mov-tipo-group',this);toggleUnidadField()"><input type="radio" value="egreso"> Egreso</label>
+          </div>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Concepto *</label><input class="form-control" id="mov-concepto" placeholder="Ej: Pago expensas, EDEA, Reparación..."></div>
+      <div class="form-group"><label class="form-label">Importe ($) *</label><input class="form-control" id="mov-importe" type="number" step="0.01" placeholder="0.00"></div>
+      <div class="form-group" id="mov-unidad-row">
+        <label class="form-label">Unidad (si es pago de expensas)</label>
+        <select class="form-control" id="mov-unidad"><option value="">— No aplica —</option></select>
+      </div>
+      <div class="form-group" id="mov-periodo-row" style="display:none">
+        <label class="form-label">Período al que corresponde</label>
+        <div style="display:flex;gap:8px">
+          <select class="form-control" id="mov-per-year" style="width:90px"></select>
+          <select class="form-control" id="mov-per-month">
+            <option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option>
+            <option value="04">Abril</option><option value="05">Mayo</option><option value="06">Junio</option>
+            <option value="07">Julio</option><option value="08">Agosto</option><option value="09">Septiembre</option>
+            <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Notas</label><input class="form-control" id="mov-notas" placeholder="Opcional"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-movimiento')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarMovimiento()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODALES -->
+<div class="modal-overlay" id="modal-unidad">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title" id="modal-unidad-title">Nueva unidad</div><button class="btn btn-ghost" onclick="closeModal('modal-unidad')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="unidad-edit-id">
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Nombre *</label><input class="form-control" id="unidad-nombre" placeholder="Ej: Piso 1°, PB, Cochera"></div>
+        <div class="form-group"><label class="form-label">Coeficiente *</label><input class="form-control" id="unidad-coef" type="number" step="0.001" min="0" max="1" placeholder="0.150"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Propietario / Inquilino</label><input class="form-control" id="unidad-propietario" placeholder="Nombre completo"></div>
+      <div class="form-group"><label class="form-label">Email</label><input class="form-control" id="unidad-email" type="email" placeholder="mail@ejemplo.com"></div>
+      <div class="form-group">
+        <label class="form-label">Usa ascensor</label>
+        <div class="radio-group" id="unidad-ascensor-group">
+          <label class="radio-item selected" onclick="selectRadio('unidad-ascensor-group',this,'1')"><input type="radio" value="1" checked> Sí</label>
+          <label class="radio-item" onclick="selectRadio('unidad-ascensor-group',this,'0')"><input type="radio" value="0"> No</label>
+        </div>
+      </div>
+      <div id="coef-check-msg" style="font-size:12px;margin-top:4px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-unidad')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarUnidad()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-gasto-fijo">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title" id="modal-gf-title">Gasto fijo</div><button class="btn btn-ghost" onclick="closeModal('modal-gasto-fijo')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="gf-edit-id">
+      <div class="form-group"><label class="form-label">Concepto *</label><input class="form-control" id="gf-concepto" placeholder="Ej: EDEA, OSSE, Limpieza..."></div>
+      <div class="form-group"><label class="form-label">Importe mensual ($) *</label><input class="form-control" id="gf-importe" type="number" step="0.01" placeholder="0.00"></div>
+      <div class="form-group">
+        <label class="form-label">División</label>
+        <div class="radio-group" id="gf-division-group">
+          <label class="radio-item selected" onclick="selectRadio('gf-division-group',this,'coeficiente')"><input type="radio" value="coeficiente" checked> Por coeficiente</label>
+          <label class="radio-item" onclick="selectRadio('gf-division-group',this,'partes_iguales')"><input type="radio" value="partes_iguales"> Partes iguales</label>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Aplica a *</label><div class="checkbox-group" id="gf-unidades-check"></div></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-gasto-fijo')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarGastoFijo()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-gasto-esp">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Gasto esporádico</div><button class="btn btn-ghost" onclick="closeModal('modal-gasto-esp')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Concepto *</label><input class="form-control" id="ge-concepto" placeholder="Ej: Reparación ascensor..."></div>
+      <div class="form-group"><label class="form-label">Importe ($) *</label><input class="form-control" id="ge-importe" type="number" step="0.01" placeholder="0.00"></div>
+      <div class="form-group">
+        <label class="form-label">División</label>
+        <div class="radio-group" id="ge-division-group">
+          <label class="radio-item selected" onclick="selectRadio('ge-division-group',this,'coeficiente')"><input type="radio" value="coeficiente" checked> Por coeficiente</label>
+          <label class="radio-item" onclick="selectRadio('ge-division-group',this,'partes_iguales')"><input type="radio" value="partes_iguales"> Partes iguales</label>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Aplica a *</label><div class="checkbox-group" id="ge-unidades-check"></div></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-gasto-esp')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarGastoEsporadico()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-confirm">
+  <div class="modal" style="width:420px">
+    <div class="modal-header"><div class="modal-title" id="confirm-title">Confirmar</div><button class="btn btn-ghost" onclick="closeModal('modal-confirm')">✕</button></div>
+    <div class="modal-body"><div class="confirm-danger" id="confirm-msg"></div></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-confirm')">Cancelar</button>
+      <button class="btn btn-danger" id="confirm-ok-btn">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-mail">
+  <div class="modal" style="width:640px">
+    <div class="modal-header"><div class="modal-title" id="mail-modal-title">Vista previa</div><button class="btn btn-ghost" onclick="closeModal('modal-mail')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Para</label><input class="form-control" id="mail-to" readonly></div>
+      <div class="form-group"><label class="form-label">Asunto</label><input class="form-control" id="mail-subject"></div>
+      <div class="form-group"><label class="form-label">Contenido del email</label><textarea class="form-control" id="mail-body" rows="16" style="font-family: monospace; white-space: pre; font-size: 13px;"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-mail')">Cerrar</button>
+      <button class="btn btn-primary" id="btn-send-mail">📤 Enviar mail</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL LIQUIDACIÓN EXTRAORDINARIA -->
+<div class="modal-overlay" id="modal-extraordinaria">
+  <div class="modal" style="width:760px;max-width:95vw">
+    <div class="modal-header"><div class="modal-title">Liquidación extraordinaria</div><button class="btn btn-ghost" onclick="closeModal('modal-extraordinaria')">✕</button></div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Título / Motivo *</label><input class="form-control" id="ex-titulo" placeholder="Ej: Pintura de fachada"></div>
+        <div class="form-group">
+          <label class="form-label">Período a impactar *</label>
+          <div style="display:flex;gap:8px">
+            <select class="form-control" id="ex-year" style="width:90px"></select>
+            <select class="form-control" id="ex-month">
+              <option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option>
+              <option value="04">Abril</option><option value="05">Mayo</option><option value="06">Junio</option>
+              <option value="07">Julio</option><option value="08">Agosto</option><option value="09">Septiembre</option>
+              <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-header" style="margin-top:8px;margin-bottom:12px">
+        <div class="section-title" style="font-size:14px">Conceptos</div>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="agregarConceptoExtra()">+ Agregar concepto</button>
+      </div>
+      <div id="ex-conceptos"></div>
+
+      <div class="card" style="background:var(--surface2);margin-top:8px;margin-bottom:0">
+        <div class="card-title" style="font-size:14px">Distribución por unidad</div>
+        <div id="ex-preview"></div>
+      </div>
+
+      <div class="form-group" style="margin-top:20px"><label class="form-label">Asunto del mail *</label><input class="form-control" id="ex-asunto" placeholder="Ej: Liquidación extraordinaria - Pintura de fachada"></div>
+      <div class="form-group">
+        <label class="form-label">Mensaje del mail *</label>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:6px">Etiquetas disponibles: <strong>{nombre}</strong> (propietario), <strong>{unidad}</strong>, <strong>{periodo}</strong>, <strong>{titulo}</strong>, <strong>{monto}</strong> (total de esa unidad) y <strong>{detalle}</strong> (desglose de conceptos). Se reemplazan al armar el mail de cada unidad.</div>
+        <textarea class="form-control" id="ex-cuerpo" rows="12" style="font-family:monospace;font-size:13px"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-extraordinaria')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarExtraordinaria()">Emitir extraordinaria</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ENVÍO DE MAILS DE UNA EXTRAORDINARIA -->
+<div class="modal-overlay" id="modal-ex-envio">
+  <div class="modal" style="width:640px">
+    <div class="modal-header"><div class="modal-title" id="ex-envio-title">Mails — Extraordinaria</div><button class="btn btn-ghost" onclick="closeModal('modal-ex-envio')">✕</button></div>
+    <div class="modal-body">
+      <div class="table-wrap">
+        <table><thead><tr><th>Unidad</th><th>Propietario</th><th>Total</th><th>Estado</th><th>Acción</th></tr></thead>
+        <tbody id="ex-envio-table"></tbody></table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-ex-envio')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const API = 'api';
+
+async function api(endpoint, method='GET', body=null) {
+  const opts = { method, headers: {'Content-Type':'application/json'} };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(`${API}/${endpoint}`, opts);
+  const data = await r.json();
+  if (!data.ok) throw new Error(data.error || 'Error');
+  return data.data;
+}
+
+function toast(msg, type='ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+let unidades = [];
+let currentPeriodo = null;
+let mailPeriodo = null;
+let mailDetalleId = null;
+
+const pageTitles = {
+  dashboard:['Dashboard','Resumen del edificio'],
+  unidades:['Unidades','Estructura y coeficientes'],
+  gastos_fijos:['Gastos Fijos','Gastos que se repiten cada mes'],
+  gastos_periodo:['Gastos del Período','Gastos esporádicos de un período'],
+  liquidacion:['Liquidación','Cálculo de expensas'],
+  enviar:['Enviar Mails','Distribución por email'],
+  plantilla_mail:['Plantilla Mail','Texto fijo para los correos de liquidación'],
+  caja:['Caja','Ingresos y egresos del edificio'],
+  cuenta_corriente:['Cuenta Corriente','Estado de cuenta por unidad'],
+  backup:['Backup','Exportar e importar la base de datos'],
+};
+
+function setupYearSelector(prefix) {
+  const el = document.getElementById(prefix+'-year');
+  if (el._init) return;
+  el._init = true;
+  const now = new Date();
+  for (let y = now.getFullYear(); y >= 2020; y--) {
+    const o = document.createElement('option');
+    o.value = y; o.textContent = y;
+    el.appendChild(o);
+  }
+  el.value = now.getFullYear();
+  const monthEl = document.getElementById(prefix+'-month');
+  if (monthEl) monthEl.value = String(now.getMonth()+1).padStart(2,'0');
+}
+
+function getPeriodo(prefix) {
+  return document.getElementById(prefix+'-year').value + document.getElementById(prefix+'-month').value;
+}
+
+function periodLabel(p) {
+  const m=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  return m[parseInt(p.slice(4))-1]+' '+p.slice(0,4);
+}
+
+function fmt(n){return '$ '+Number(n).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function coefFmt(n){return Number(n).toFixed(4)}
+function coefSum(){return unidades.reduce((s,u)=>s+parseFloat(u.coeficiente||0),0)}
+function openModal(id){document.getElementById(id).classList.add('open')}
+function closeModal(id){document.getElementById(id).classList.remove('open')}
+function getRadioValue(gid){const s=document.getElementById(gid).querySelector('.radio-item.selected input');return s?s.value:null}
+function selectRadio(gid,el){document.getElementById(gid).querySelectorAll('.radio-item').forEach(r=>r.classList.remove('selected'));el.classList.add('selected')}
+function getChecked(gid){return [...document.getElementById(gid).querySelectorAll('.checkbox-item.checked')].map(e=>e.dataset.id)}
+
+function confirmDialog(title,msg,onOk){
+  document.getElementById('confirm-title').textContent=title;
+  document.getElementById('confirm-msg').textContent=msg;
+  document.getElementById('confirm-ok-btn').onclick=()=>{closeModal('modal-confirm');onOk()};
+  openModal('modal-confirm');
+}
+
+function buildCheckboxes(containerId, selected=[]) {
+  const c = document.getElementById(containerId);
+  c.innerHTML = '';
+  unidades.forEach(u => {
+    const isChecked = selected.length===0 || selected.map(String).includes(String(u.id));
+    const el = document.createElement('label');
+    el.className = 'checkbox-item'+(isChecked?' checked':'');
+    el.dataset.id = u.id;
+    el.innerHTML = `<input type="checkbox" ${isChecked?'checked':''}>${u.nombre}`;
+    el.addEventListener('click', function(e) {
+      e.preventDefault();
+      this.classList.toggle('checked');
+      const checkbox = this.querySelector('input');
+      checkbox.checked = this.classList.contains('checked');
+    });
+    c.appendChild(el);
+  });
+}
+
+async function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const pageEl = document.getElementById('page-'+page);
+  if (!pageEl) return;
+  pageEl.classList.add('active');
+  const navEl = document.querySelector(`.nav-item[onclick="navigate('${page}')"]`);
+  if (navEl) navEl.classList.add('active');
+  document.getElementById('page-title').textContent = pageTitles[page]?.[0] || page;
+  document.getElementById('page-sub').textContent = pageTitles[page]?.[1] || '';
+  unidades = await api('unidades.php');
+  if (page==='dashboard') renderDashboard();
+  else if (page==='unidades') renderUnidades();
+  else if (page==='gastos_fijos') renderGastosFijos();
+  else if (page==='gastos_periodo') setupYearSelector('period');
+  else if (page==='liquidacion') { setupYearSelector('liq'); renderLiquidacion(); }
+  else if (page==='enviar') setupYearSelector('mail');
+  else if (page==='plantilla_mail') renderPlantillaMail();
+  else if (page==='caja') initCaja();
+  else if (page==='cuenta_corriente') { setupYearSelector('cc'); renderCuentaCorriente(); }
+  else if (page==='backup') initBackup();
+}
+
+// ── Dashboard ──
+function renderDashboard() {
+  const sum = coefSum();
+  document.getElementById('stat-unidades').textContent = unidades.length;
+  document.getElementById('stat-coef').textContent = coefFmt(sum);
+  api('gastos_fijos.php').then(g => document.getElementById('stat-gastos').textContent = g.length);
+  document.getElementById('dash-units-table').innerHTML = unidades.map(u=>`
+    <tr>
+      <td><strong>${u.nombre}</strong></td>
+      <td>${u.propietario||'<span style="color:var(--text3)">—</span>'}</td>
+      <td>${u.email||'<span style="color:var(--text3)">—</span>'}</td>
+      <td class="mono">${coefFmt(u.coeficiente)}</td>
+      <td style="width:120px">
+        <div class="coef-bar-wrap"><div class="coef-bar" style="width:${(u.coeficiente*100).toFixed(1)}%"></div></div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">${(u.coeficiente*100).toFixed(1)}%</div>
+      </td>
+    </tr>`).join('');
+}
+
+// ── Unidades ──
+function renderUnidades() {
+  const sum = coefSum();
+  const badge = document.getElementById('coef-badge');
+  badge.textContent = 'Σ = '+coefFmt(sum);
+  badge.className = 'coef-sum-badge '+(Math.abs(sum-1)<0.0001?'coef-ok':'coef-error');
+  document.getElementById('unidades-table').innerHTML = unidades.map(u=>`
+    <tr>
+      <td><strong>${u.nombre}</strong></td>
+      <td>${u.propietario||'—'}</td>
+      <td>${u.email||'—'}</td>
+      <td class="mono">${coefFmt(u.coeficiente)}</td>
+      <td>${u.ascensor=='1'?'<span class="badge badge-green">Sí</span>':'<span class="badge badge-red">No</span>'}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="editUnidad(${u.id})">✏</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="deleteUnidad(${u.id})">✕</button>
+      </td>
+    </tr>`).join('')||`<tr><td colspan="6"><div class="empty-state"><div class="emoji">⬡</div><p>No hay unidades.</p></div></td></tr>`;
+}
+
+function openModalUnidad(u=null) {
+  document.getElementById('modal-unidad-title').textContent = u?'Editar unidad':'Nueva unidad';
+  document.getElementById('unidad-edit-id').value = u?u.id:'';
+  document.getElementById('unidad-nombre').value = u?u.nombre:'';
+  document.getElementById('unidad-coef').value = u?u.coeficiente:'';
+  document.getElementById('unidad-propietario').value = u?u.propietario:'';
+  document.getElementById('unidad-email').value = u?u.email:'';
+  const grp = document.getElementById('unidad-ascensor-group');
+  grp.querySelectorAll('.radio-item').forEach(r=>r.classList.remove('selected'));
+  const val = u?(u.ascensor=='1'?'1':'0'):'1';
+  grp.querySelector(`.radio-item input[value="${val}"]`)?.parentElement.classList.add('selected');
+  document.getElementById('coef-check-msg').innerHTML='';
+  openModal('modal-unidad');
+}
+
+function editUnidad(id){openModalUnidad(unidades.find(u=>u.id==id))}
+
+async function guardarUnidad(){
+  const nombre=document.getElementById('unidad-nombre').value.trim();
+  const coef=parseFloat(document.getElementById('unidad-coef').value);
+  const propietario=document.getElementById('unidad-propietario').value.trim();
+  const email=document.getElementById('unidad-email').value.trim();
+  const ascensor=getRadioValue('unidad-ascensor-group');
+  const editId=document.getElementById('unidad-edit-id').value;
+  if(!nombre||isNaN(coef)){alert('Completá nombre y coeficiente');return}
+  try {
+    if(editId) await api(`unidades.php?id=${editId}`,'PUT',{nombre,coeficiente:coef,propietario,email,ascensor});
+    else await api('unidades.php','POST',{nombre,coeficiente:coef,propietario,email,ascensor});
+    closeModal('modal-unidad');
+    unidades=await api('unidades.php');
+    renderUnidades();
+    toast('Unidad guardada');
+  } catch(e){document.getElementById('coef-check-msg').innerHTML=`<span style="color:var(--danger)">⚠ ${e.message}</span>`}
+}
+
+function deleteUnidad(id){
+  confirmDialog('Eliminar unidad','¿Eliminás esta unidad? Puede afectar liquidaciones.',async()=>{
+    await api(`unidades.php?id=${id}`,'DELETE');
+    unidades=await api('unidades.php');
+    renderUnidades();
+    toast('Unidad eliminada');
+  });
+}
+
+// ── Gastos Fijos ──
+async function renderGastosFijos(){
+  const gastos=await api('gastos_fijos.php');
+  document.getElementById('gastos-fijos-table').innerHTML=gastos.map(g=>{
+    const tags=g.unidades.map(uid=>{const u=unidades.find(x=>x.id==uid);return u?`<span class="tag">${u.nombre}</span>`:''}).join(' ');
+    return `<tr>
+      <td><strong>${g.concepto}</strong></td>
+      <td class="mono">${fmt(g.importe)}</td>
+      <td><span class="badge ${g.division==='coeficiente'?'badge-blue':'badge-gold'}">${g.division==='coeficiente'?'Coeficiente':'Partes iguales'}</span></td>
+      <td>${tags}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick='editGastoFijo(${JSON.stringify(g)})'>✏</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="deleteGastoFijo(${g.id})">✕</button>
+      </td></tr>`;
+  }).join('')||`<tr><td colspan="5"><div class="empty-state"><div class="emoji">⊕</div><p>No hay gastos fijos.</p></div></td></tr>`;
+}
+
+function openModalGastoFijo(g=null){
+  document.getElementById('modal-gf-title').textContent=g?'Editar gasto fijo':'Nuevo gasto fijo';
+  document.getElementById('gf-edit-id').value=g?g.id:'';
+  document.getElementById('gf-concepto').value=g?g.concepto:'';
+  document.getElementById('gf-importe').value=g?g.importe:'';
+  const grp=document.getElementById('gf-division-group');
+  grp.querySelectorAll('.radio-item').forEach(r=>r.classList.remove('selected'));
+  const div=g?g.division:'coeficiente';
+  grp.querySelector(`.radio-item input[value="${div}"]`)?.parentElement.classList.add('selected');
+  buildCheckboxes('gf-unidades-check', g?g.unidades:unidades.map(u=>u.id));
+  openModal('modal-gasto-fijo');
+}
+
+function editGastoFijo(g){openModalGastoFijo(g)}
+
+async function guardarGastoFijo(){
+  const concepto=document.getElementById('gf-concepto').value.trim();
+  const importe=parseFloat(document.getElementById('gf-importe').value);
+  const division=getRadioValue('gf-division-group');
+  const uids=getChecked('gf-unidades-check');
+  const editId=document.getElementById('gf-edit-id').value;
+  if(!concepto||isNaN(importe)||!uids.length){alert('Completá todos los campos');return}
+  try{
+    if(editId) await api(`gastos_fijos.php?id=${editId}`,'PUT',{concepto,importe,division,unidades:uids});
+    else await api('gastos_fijos.php','POST',{concepto,importe,division,unidades:uids});
+    closeModal('modal-gasto-fijo');
+    renderGastosFijos();
+    toast('Gasto guardado');
+  }catch(e){alert(e.message)}
+}
+
+function deleteGastoFijo(id){
+  confirmDialog('Eliminar gasto','¿Eliminás este gasto fijo?',async()=>{
+    await api(`gastos_fijos.php?id=${id}`,'DELETE');
+    renderGastosFijos();
+    toast('Gasto eliminado');
+  });
+}
+
+// ── Gastos Esporádicos ──
+async function loadPeriod(){
+  currentPeriodo=getPeriodo('period');
+  document.getElementById('period-label').textContent=periodLabel(currentPeriodo);
+  document.getElementById('periodo-content').style.display='block';
+  const liq=await api(`liquidacion.php?periodo=${currentPeriodo}`);
+  document.getElementById('liq-warning').style.display=liq?'flex':'none';
+  await renderGastosEsporadicos();
+}
+
+async function renderGastosEsporadicos(){
+  const gastos=await api(`gastos_esporadicos.php?periodo=${currentPeriodo}`);
+  document.getElementById('gastos-esporadicos-table').innerHTML=gastos.map(g=>{
+    const tags=g.unidades.map(uid=>{const u=unidades.find(x=>x.id==uid);return u?`<span class="tag">${u.nombre}</span>`:''}).join(' ');
+    return `<tr>
+      <td><strong>${g.concepto}</strong></td>
+      <td class="mono">${fmt(g.importe)}</td>
+      <td><span class="badge ${g.division==='coeficiente'?'badge-blue':'badge-gold'}">${g.division==='coeficiente'?'Coeficiente':'Partes iguales'}</span></td>
+      <td>${tags}</td>
+      <td><button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="deleteGastoEsporadico(${g.id})">✕</button></td></tr>`;
+  }).join('')||`<tr><td colspan="5"><div class="empty-state" style="padding:24px"><div class="emoji" style="font-size:28px">◎</div><p>Sin gastos esporádicos.</p></div></td></tr>`;
+}
+
+function openModalGastoEsporadico(){
+  document.getElementById('ge-concepto').value='';
+  document.getElementById('ge-importe').value='';
+  const grp=document.getElementById('ge-division-group');
+  grp.querySelectorAll('.radio-item').forEach(r=>r.classList.remove('selected'));
+  grp.querySelector('.radio-item:first-child').classList.add('selected');
+  buildCheckboxes('ge-unidades-check', unidades.map(u=>u.id));
+  openModal('modal-gasto-esp');
+}
+
+async function guardarGastoEsporadico(){
+  const concepto=document.getElementById('ge-concepto').value.trim();
+  const importe=parseFloat(document.getElementById('ge-importe').value);
+  const division=getRadioValue('ge-division-group');
+  const uids=getChecked('ge-unidades-check');
+  if(!concepto||isNaN(importe)||!uids.length){alert('Completá todos los campos');return}
+  try{
+    await api('gastos_esporadicos.php','POST',{periodo:currentPeriodo,concepto,importe,division,unidades:uids});
+    closeModal('modal-gasto-esp');
+    await loadPeriod();
+    toast('Gasto agregado');
+  }catch(e){alert(e.message)}
+}
+
+async function deleteGastoEsporadico(id){
+  confirmDialog('Eliminar gasto','¿Eliminás este gasto del período?',async()=>{
+    await api(`gastos_esporadicos.php?id=${id}`,'DELETE');
+    await renderGastosEsporadicos();
+    toast('Gasto eliminado');
+  });
+}
+
+// ── Liquidación ──
+async function renderLiquidacion(){
+  const periodo=getPeriodo('liq');
+  renderExtraordinarias();
+  const liq=await api(`liquidacion.php?periodo=${periodo}`);
+  const cont=document.getElementById('liq-content');
+  const btnBorrar=document.getElementById('btn-borrar-liq');
+  if(!liq){
+    btnBorrar.style.display='none';
+    cont.innerHTML=`<div class="empty-state"><div class="emoji">◻</div><p>No hay liquidación para este período.<br>Hacé clic en <strong>Calcular liquidación</strong>.</p></div>`;
+    return;
+  }
+  btnBorrar.style.display='inline-flex';
+  const total=liq.unidades.reduce((s,u)=>s+parseFloat(u.total),0);
+  cont.innerHTML=`
+    <div class="alert alert-success">✓ Calculada el ${new Date(liq.calculada_en).toLocaleString('es-AR')} · Total: <strong>${fmt(total)}</strong></div>
+    <div class="grid-2">
+      ${liq.unidades.map(u=>`
+        <div class="liq-unit">
+          <div class="liq-unit-header">
+            <div><div class="liq-unit-name">${u.nombre}</div><div style="font-size:12px;color:var(--text3)">${u.propietario||'—'}</div></div>
+            <div class="liq-unit-total">${fmt(u.total)}</div>
+          </div>
+          ${u.lineas.map(l=>`
+            <div class="liq-line">
+              <div class="liq-line-name">${l.concepto} <span class="badge ${l.tipo==='esporadico'?'badge-gold':'badge-blue'}" style="font-size:9px;padding:1px 5px">${l.tipo==='esporadico'?'esp':'fijo'}</span></div>
+              <div class="liq-line-amount">${fmt(l.importe)}</div>
+            </div>`).join('')}
+          ${parseFloat(u.saldo_anterior||0) !== 0 ? `
+            <div class="liq-line">
+              <div class="liq-line-name" style="color:${parseFloat(u.saldo_anterior)>0?'var(--danger)':'var(--success)'}">Saldo anterior</div>
+              <div class="liq-line-amount" style="color:${parseFloat(u.saldo_anterior)>0?'var(--danger)':'var(--success)'}">${fmt(u.saldo_anterior)}</div>
+            </div>` : ''}
+        </div>`).join('')}
+    </div>`;
+}
+
+async function calcularLiquidacion(){
+  const periodo=getPeriodo('liq');
+  try{
+    await api('liquidacion.php','POST',{periodo});
+    await renderLiquidacion();
+    toast('Liquidación calculada');
+  }catch(e){alert(e.message)}
+}
+
+function borrarLiquidacion(){
+  const periodo=getPeriodo('liq');
+  confirmDialog('Borrar liquidación',`¿Borrás la liquidación de ${periodLabel(periodo)}?`,async()=>{
+    await api(`liquidacion.php?periodo=${periodo}`,'DELETE');
+    await renderLiquidacion();
+    toast('Liquidación eliminada');
+  });
+}
+
+document.addEventListener('change',e=>{
+  if(e.target.closest('#liq-year,#liq-month')) renderLiquidacion();
+});
+
+// ── Liquidación Extraordinaria ──
+let exIdx = 0;
+let exMailTemplate = null;   // {asunto, cuerpo, titulo, periodo} — cache de la última extraordinaria emitida en esta sesión
+let exLiqActual = null;      // extraordinaria abierta actualmente en el modal de envío
+let exUnidadesCache = {};    // detalle_id -> detalle (para el modal de envío)
+let exMailDetalleId = null;
+
+async function renderExtraordinarias(){
+  const periodo=getPeriodo('liq');
+  const lista=await api(`liquidacion_extraordinaria.php?periodo=${periodo}`);
+  const cont=document.getElementById('ex-lista');
+  if(!lista.length){
+    cont.innerHTML=`<div style="color:var(--text3);font-size:13px;padding:4px 0">Sin extraordinarias emitidas para ${periodLabel(periodo)}.</div>`;
+    return;
+  }
+  cont.innerHTML=lista.map(l=>`
+    <div class="liq-unit" style="margin-bottom:10px">
+      <div class="liq-unit-header">
+        <div>
+          <div class="liq-unit-name">${l.titulo}</div>
+          <div style="font-size:12px;color:var(--text3)">${new Date(l.calculada_en).toLocaleString('es-AR')} · ${l.cant_unidades} unidad(es)</div>
+        </div>
+        <div class="liq-unit-total">${fmt(l.total_general)}</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+        <span class="badge ${l.cant_enviados==l.cant_unidades?'badge-green':'badge-gold'}">${l.cant_enviados}/${l.cant_unidades} mails enviados</span>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary btn-sm" onclick="abrirEnvioExtraordinaria(${l.id})">✉ Mails</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="anularExtraordinaria(${l.id})">✕ Anular</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function plantillaConceptoExtra(idx){
+  return `<div class="concept-row">
+    <button type="button" class="btn btn-ghost btn-sm" style="position:absolute;top:10px;right:10px;color:var(--danger)" onclick="quitarConceptoExtra(this)">✕</button>
+    <div class="grid-2">
+      <div class="form-group"><label class="form-label">Concepto *</label><input class="form-control ex-concepto-input" placeholder="Ej: Pintura de fachada"></div>
+      <div class="form-group"><label class="form-label">Importe ($) *</label><input class="form-control ex-importe-input" type="number" step="0.01" placeholder="0.00"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">División</label>
+      <div class="radio-group ex-division-group" id="ex-div-${idx}">
+        <label class="radio-item selected" onclick="selectRadio('ex-div-${idx}',this)"><input type="radio" value="coeficiente" checked> Por coeficiente</label>
+        <label class="radio-item" onclick="selectRadio('ex-div-${idx}',this)"><input type="radio" value="partes_iguales"> Partes iguales</label>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Unidades *</label><div class="checkbox-group ex-unidades-check" id="ex-uni-${idx}"></div></div>
+  </div>`;
+}
+
+function agregarConceptoExtra(){
+  const idx=exIdx++;
+  const wrap=document.createElement('div');
+  wrap.innerHTML=plantillaConceptoExtra(idx);
+  document.getElementById('ex-conceptos').appendChild(wrap.firstElementChild);
+  buildCheckboxes(`ex-uni-${idx}`, unidades.map(u=>u.id));
+  actualizarPreviewExtra();
+}
+
+function quitarConceptoExtra(btn){
+  btn.closest('.concept-row').remove();
+  actualizarPreviewExtra();
+}
+
+function leerConceptosExtra(){
+  return [...document.querySelectorAll('#ex-conceptos .concept-row')].map(row=>({
+    concepto: row.querySelector('.ex-concepto-input').value.trim(),
+    importe: parseFloat(row.querySelector('.ex-importe-input').value) || 0,
+    division: getRadioValue(row.querySelector('.ex-division-group').id),
+    unidades: getChecked(row.querySelector('.ex-unidades-check').id).map(Number),
+  }));
+}
+
+function calcularDistribucionExtra(conceptos){
+  const porUnidad={};
+  unidades.forEach(u=>porUnidad[u.id]={unidad:u,lineas:[],subtotal:0});
+  conceptos.forEach(c=>{
+    if(!c.concepto || !(c.importe>0) || !c.unidades.length) return;
+    if(c.division==='partes_iguales'){
+      const parte=c.importe/c.unidades.length;
+      c.unidades.forEach(uid=>{
+        if(!porUnidad[uid]) return;
+        porUnidad[uid].lineas.push({concepto:c.concepto,importe:parte});
+        porUnidad[uid].subtotal+=parte;
+      });
+    } else {
+      let coefAfect=0;
+      unidades.forEach(u=>{ if(c.unidades.includes(u.id)) coefAfect+=parseFloat(u.coeficiente); });
+      if(coefAfect>0){
+        c.unidades.forEach(uid=>{
+          const u=porUnidad[uid]?.unidad;
+          if(!u) return;
+          const parte=c.importe*(parseFloat(u.coeficiente)/coefAfect);
+          porUnidad[uid].lineas.push({concepto:c.concepto,importe:parte});
+          porUnidad[uid].subtotal+=parte;
+        });
+      }
+    }
+  });
+  return Object.values(porUnidad).filter(r=>r.subtotal>0);
+}
+
+function actualizarPreviewExtra(){
+  const dist=calcularDistribucionExtra(leerConceptosExtra());
+  const wrap=document.getElementById('ex-preview');
+  if(!dist.length){
+    wrap.innerHTML=`<div style="color:var(--text3);font-size:13px">Completá al menos un concepto con importe y unidades para ver la distribución.</div>`;
+    return;
+  }
+  const total=dist.reduce((s,r)=>s+r.subtotal,0);
+  wrap.innerHTML=`
+    <div class="table-wrap"><table><thead><tr><th>Unidad</th><th>Detalle</th><th>Importe</th></tr></thead>
+    <tbody>
+      ${dist.map(r=>`<tr>
+        <td><strong>${r.unidad.nombre}</strong></td>
+        <td style="font-size:12px;color:var(--text2)">${r.lineas.map(l=>`${l.concepto}: ${fmt(l.importe)}`).join(' · ')}</td>
+        <td class="mono">${fmt(r.subtotal)}</td>
+      </tr>`).join('')}
+    </tbody></table></div>
+    <div style="text-align:right;margin-top:8px;font-weight:600">Total: ${fmt(total)}</div>`;
+}
+
+document.getElementById('ex-conceptos').addEventListener('input', actualizarPreviewExtra);
+document.getElementById('ex-conceptos').addEventListener('click', actualizarPreviewExtra);
+
+// Textos por defecto del mail de una extraordinaria. Reutiliza el saludo,
+// el cierre y la firma configurados en "Plantilla Mail" para que el tono sea
+// el mismo que el de las expensas mensuales. Las etiquetas {…} se reemplazan
+// por unidad al armar cada mail (ver previewMailExtra).
+const PLANTILLA_EXTRA_FALLBACK={saludo:'Estimado/a {nombre},',footer:'Por favor realice el pago antes del vencimiento del mes en curso.',firma:'Saludos cordiales,\nAdministración del Edificio'};
+
+function asuntoExtraPorDefecto(){
+  return 'Expensa extraordinaria - {titulo} - {unidad}';
+}
+
+function cuerpoExtraPorDefecto(p){
+  return `${p.saludo}\n\nLe informamos que se emitió una expensa extraordinaria correspondiente a "{titulo}", que impacta en el período {periodo}.\n\nDETALLE:\n{detalle}\n\n──────────────────────────────────\n  TOTAL A PAGAR    {monto}\n──────────────────────────────────\n\n${p.footer}\n\n${p.firma}`;
+}
+
+async function openModalExtraordinaria(){
+  document.getElementById('ex-titulo').value='';
+  document.getElementById('ex-asunto').value='';
+  document.getElementById('ex-cuerpo').value='';
+  document.getElementById('ex-conceptos').innerHTML='';
+  setupYearSelector('ex');
+  const liqYear=document.getElementById('liq-year').value;
+  const liqMonth=document.getElementById('liq-month').value;
+  if(liqYear) document.getElementById('ex-year').value=liqYear;
+  if(liqMonth) document.getElementById('ex-month').value=liqMonth;
+  agregarConceptoExtra();
+  openModal('modal-extraordinaria');
+
+  let plantilla=PLANTILLA_EXTRA_FALLBACK;
+  try{ plantilla=await getPlantillaMail(); }catch(e){}
+  document.getElementById('ex-asunto').value=asuntoExtraPorDefecto();
+  document.getElementById('ex-cuerpo').value=cuerpoExtraPorDefecto(plantilla);
+}
+
+async function guardarExtraordinaria(){
+  const titulo=document.getElementById('ex-titulo').value.trim();
+  const periodo=document.getElementById('ex-year').value+document.getElementById('ex-month').value;
+  const asunto=document.getElementById('ex-asunto').value.trim();
+  const cuerpo=document.getElementById('ex-cuerpo').value.trim();
+  const conceptos=leerConceptosExtra();
+
+  if(!titulo){alert('Falta el título / motivo');return}
+  if(!asunto||!cuerpo){alert('Completá el asunto y el mensaje del mail');return}
+  if(!conceptos.length||conceptos.some(c=>!c.concepto||!(c.importe>0)||!c.unidades.length)){
+    alert('Revisá los conceptos: todos necesitan nombre, importe y al menos una unidad');
+    return;
+  }
+
+  try{
+    const res=await api('liquidacion_extraordinaria.php','POST',{titulo,periodo,conceptos});
+    closeModal('modal-extraordinaria');
+    toast('Extraordinaria emitida: '+fmt(res.total_general));
+    exMailTemplate={asunto,cuerpo,titulo,periodo};
+    await renderExtraordinarias();
+    await abrirEnvioExtraordinaria(res.id);
+  }catch(e){alert(e.message)}
+}
+
+function anularExtraordinaria(id){
+  confirmDialog('Anular extraordinaria','¿Anulás esta liquidación extraordinaria? Se revertirá el cargo en la cuenta corriente de las unidades afectadas.',async()=>{
+    await api(`liquidacion_extraordinaria.php?id=${id}`,'DELETE');
+    await renderExtraordinarias();
+    toast('Extraordinaria anulada');
+  });
+}
+
+async function abrirEnvioExtraordinaria(id){
+  const liq=await api(`liquidacion_extraordinaria.php?id=${id}`);
+  if(!liq){toast('No se encontró la extraordinaria','err');return}
+  exLiqActual=liq;
+  liq.unidades.forEach(u=>exUnidadesCache[u.id]=u);
+  document.getElementById('ex-envio-title').textContent=`Mails — ${liq.titulo} (${periodLabel(liq.periodo)})`;
+  document.getElementById('ex-envio-table').innerHTML=liq.unidades.map(u=>`
+    <tr>
+      <td><strong>${u.nombre}</strong></td>
+      <td>${u.propietario||'—'}</td>
+      <td class="mono">${fmt(u.total)}</td>
+      <td>${u.mail_enviado=='1' ? '<span class="badge badge-green">Enviado</span>' : '<span class="badge badge-gold">Pendiente</span>'}</td>
+      <td><button class="btn btn-sm ${u.email?'btn-primary':'btn-secondary'}" onclick="previewMailExtra(${u.id})">${u.mail_enviado=='1'?'👁 Ver':'📤 Enviar'}</button></td>
+    </tr>`).join('');
+  openModal('modal-ex-envio');
+}
+
+async function previewMailExtra(detalleId){
+  const u=exUnidadesCache[detalleId];
+  if(!u) return;
+  exMailDetalleId=detalleId;
+  const per=periodLabel(exLiqActual.periodo);
+  const vars={
+    nombre:u.propietario||u.nombre,
+    unidad:u.nombre,
+    periodo:per,
+    titulo:exLiqActual.titulo,
+    monto:fmt(u.total),
+    detalle:u.lineas.map(l=>`  · ${l.concepto}    ${fmt(l.importe)}`).join('\n'),
+  };
+
+  // Si la extraordinaria se emitió en esta sesión, se usa el texto que escribió
+  // el usuario en el asistente. Si no (p. ej. tras recargar la página), se
+  // regenera el texto por defecto a partir de la plantilla configurada.
+  let tpl=exMailTemplate;
+  if(!(tpl && tpl.periodo===exLiqActual.periodo && tpl.titulo===exLiqActual.titulo)){
+    let plantilla=PLANTILLA_EXTRA_FALLBACK;
+    try{ plantilla=await getPlantillaMail(); }catch(e){}
+    tpl={asunto:asuntoExtraPorDefecto(), cuerpo:cuerpoExtraPorDefecto(plantilla)};
+  }
+  const asunto=aplicarPlantilla(tpl.asunto, vars);
+  const cuerpoTxt=aplicarPlantilla(tpl.cuerpo, vars);
+
+  document.getElementById('mail-to').value=u.email||'(sin email)';
+  document.getElementById('mail-subject').value=asunto;
+  document.getElementById('mail-body').value=cuerpoTxt;
+  document.getElementById('mail-modal-title').textContent=`Mail — ${u.nombre}`;
+  const btn=document.getElementById('btn-send-mail');
+  if(!u.email){btn.disabled=true;btn.textContent='Sin email registrado'}
+  else if(u.mail_enviado=='1'){btn.disabled=true;btn.textContent='✓ Ya enviado'}
+  else{btn.disabled=false;btn.textContent='📤 Enviar mail';btn.onclick=enviarMailExtra}
+  openModal('modal-mail');
+}
+
+async function enviarMailExtra(){
+  const btn=document.getElementById('btn-send-mail');
+  const asunto=document.getElementById('mail-subject').value.trim();
+  const cuerpo=document.getElementById('mail-body').value.trim();
+  if(!asunto||!cuerpo){alert('El asunto y el contenido no pueden estar vacíos');return}
+  btn.innerHTML='<span class="spinner"></span> Enviando...';
+  btn.disabled=true;
+  try{
+    const res=await api('enviar_mail.php','POST',{detalle_id:exMailDetalleId,asunto,cuerpo});
+    closeModal('modal-mail');
+    toast('✓ '+res.mensaje);
+    await abrirEnvioExtraordinaria(exLiqActual.id);
+    await renderExtraordinarias();
+  }catch(e){
+    btn.disabled=false; btn.textContent='📤 Enviar mail';
+    toast('Error: '+e.message,'err');
+  }
+}
+
+// ── Mails ──
+const mailUnidadesCache = {};
+let plantillaMailCache = null;
+
+async function getPlantillaMail(force=false) {
+  if (plantillaMailCache && !force) return plantillaMailCache;
+  plantillaMailCache = await api('plantilla_mail.php');
+  return plantillaMailCache;
+}
+
+function aplicarPlantilla(texto, vars) {
+  return texto.replace(/\{(\w+)\}/g, (m,k) => vars[k] !== undefined ? vars[k] : m);
+}
+
+async function renderPlantillaMail(){
+  const p = await getPlantillaMail(true);
+  document.getElementById('pm-asunto').value = p.asunto;
+  document.getElementById('pm-saludo').value = p.saludo;
+  document.getElementById('pm-intro').value = p.intro;
+  document.getElementById('pm-footer').value = p.footer;
+  document.getElementById('pm-firma').value = p.firma;
+}
+
+async function guardarPlantillaMail(){
+  const asunto = document.getElementById('pm-asunto').value.trim();
+  const saludo = document.getElementById('pm-saludo').value.trim();
+  const intro  = document.getElementById('pm-intro').value.trim();
+  const footer = document.getElementById('pm-footer').value.trim();
+  const firma  = document.getElementById('pm-firma').value.trim();
+  if(!asunto||!saludo||!intro||!footer||!firma){alert('Completá todos los campos');return}
+  try{
+    plantillaMailCache = await api('plantilla_mail.php','PUT',{asunto,saludo,intro,footer,firma});
+    toast('Plantilla guardada');
+  }catch(e){alert(e.message)}
+}
+
+function restaurarPlantillaMail(){
+  confirmDialog('Restaurar predeterminado','¿Restaurás el texto predeterminado del mail? Se perderán los cambios actuales (recordá que hay que guardar para confirmarlo).',()=>{
+    document.getElementById('pm-asunto').value = 'Expensas {periodo} - {unidad}';
+    document.getElementById('pm-saludo').value = 'Estimado/a {nombre},';
+    document.getElementById('pm-intro').value = 'Le enviamos la liquidación de expensas correspondiente al período {periodo}.';
+    document.getElementById('pm-footer').value = 'Por favor realice el pago antes del vencimiento del mes en curso.';
+    document.getElementById('pm-firma').value = 'Saludos cordiales,\nAdministración del Edificio';
+  });
+}
+
+async function loadMailPeriod(){
+  mailPeriodo = getPeriodo('mail');
+  const liq = await api(`liquidacion.php?periodo=${mailPeriodo}`);
+  const cont = document.getElementById('mail-content');
+  if(!liq){
+    cont.innerHTML = `<div class="alert alert-warning">⚠ No hay liquidación para ${periodLabel(mailPeriodo)}. Calculala primero.</div>`;
+    return;
+  }
+  liq.unidades.forEach(u => { mailUnidadesCache[u.id] = u; });
+  cont.innerHTML = `
+    <div class="card">
+      <div class="card-title">✉ Mails — ${periodLabel(mailPeriodo)}</div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Unidad</th><th>Propietario</th><th>Email</th><th>Total</th><th>Estado</th><th>Acción</th></tr></thead>
+        <tbody>
+          ${liq.unidades.map(u => `
+            <tr>
+              <td><strong>${u.nombre}</strong></td>
+              <td>${u.propietario || '—'}</td>
+              <td>${u.email || '<span style="color:var(--text3)">Sin email</span>'}</td>
+              <td class="mono">${fmt(u.total)}</td>
+              <td>${u.mail_enviado == '1' ? '<span class="badge badge-green">Enviado</span>' : '<span class="badge badge-gold">Pendiente</span>'}</td>
+              <td>
+                <button class="btn btn-sm ${u.email ? 'btn-primary' : 'btn-secondary'}" onclick="previewMail(${u.id})">
+                  ${u.mail_enviado == '1' ? '👁 Ver' : '📤 Enviar'}
+                </button>
+              </td>
+            </tr>`).join('')}
+        </tbody></table>
+      </div>
+    </div>`;
+}
+
+async function previewMail(detalleId){
+  const u = mailUnidadesCache[detalleId];
+  if (!u) return;
+  mailDetalleId = detalleId;
+  const per = periodLabel(mailPeriodo);
+  const plantilla = await getPlantillaMail();
+  const vars = { nombre: u.propietario || u.nombre, unidad: u.nombre, periodo: per };
+  const lineas = u.lineas.map(l => `  · ${l.concepto}    ${fmt(l.importe)}`).join('\n');
+  const saldo = parseFloat(u.saldo_anterior || 0);
+  const saldoLinea = saldo !== 0 ? `\n  · Saldo anterior    ${fmt(saldo)}` : '';
+  const body = `${aplicarPlantilla(plantilla.saludo, vars)}\n\n${aplicarPlantilla(plantilla.intro, vars)}\n\nDETALLE:\n${lineas}${saldoLinea}\n\n──────────────────────────────────\n  TOTAL A PAGAR    ${fmt(u.total)}\n──────────────────────────────────\n\n${aplicarPlantilla(plantilla.footer, vars)}\n\n${plantilla.firma}`;
+  document.getElementById('mail-to').value = u.email || '(sin email)';
+  document.getElementById('mail-subject').value = aplicarPlantilla(plantilla.asunto, vars);
+  document.getElementById('mail-body').value = body;
+  document.getElementById('mail-modal-title').textContent = `Mail — ${u.nombre}`;
+  const btn = document.getElementById('btn-send-mail');
+  if (!u.email) { btn.disabled = true; btn.textContent = 'Sin email registrado'; }
+  else if (u.mail_enviado == '1') { btn.disabled = true; btn.textContent = '✓ Ya enviado'; }
+  else { btn.disabled = false; btn.textContent = '📤 Enviar mail'; btn.onclick = enviarMail; }
+  openModal('modal-mail');
+}
+
+async function enviarMail(){
+  const btn=document.getElementById('btn-send-mail');
+  const asunto = document.getElementById('mail-subject').value.trim();
+  const cuerpo = document.getElementById('mail-body').value.trim();
+  
+  if (!asunto || !cuerpo) {
+    alert('El asunto y el contenido no pueden estar vacíos');
+    return;
+  }
+  
+  btn.innerHTML='<span class="spinner"></span> Enviando...';
+  btn.disabled=true;
+  try{
+    const res=await api('enviar_mail.php','POST',{
+      detalle_id: mailDetalleId,
+      asunto: asunto,
+      cuerpo: cuerpo
+    });
+    closeModal('modal-mail');
+    toast('✓ '+res.mensaje);
+    await loadMailPeriod();
+  }catch(e){
+    btn.disabled=false; btn.textContent='📤 Enviar mail';
+    toast('Error: '+e.message,'err');
+  }
+}
+
+// ── Caja ──
+let cajaPagina = 1;
+let cajaBuscarTimer = null;
+
+// Filtro en tiempo real por descripción, con debounce para no golpear el server en cada tecla
+function cajaBuscarInput() {
+  clearTimeout(cajaBuscarTimer);
+  cajaBuscarTimer = setTimeout(() => { cajaPagina = 1; renderCaja(); }, 300);
+}
+
+function initCaja() {
+  const fy = document.getElementById('caja-filter-year');
+  if (!fy._init) {
+    fy._init = true;
+    const now = new Date();
+    const opt0 = document.createElement('option');
+    opt0.value = ''; opt0.textContent = 'Todos los años';
+    fy.appendChild(opt0);
+    for (let y = now.getFullYear(); y >= 2020; y--) {
+      const o = document.createElement('option');
+      o.value = y; o.textContent = y;
+      fy.appendChild(o);
+    }
+  }
+  cajaPagina = 1;
+  renderCaja();
+}
+
+async function renderCaja() {
+  const tipo   = document.getElementById('caja-filter-tipo').value;
+  const anio   = document.getElementById('caja-filter-year').value;
+  const mes    = document.getElementById('caja-filter-month').value;
+  const buscar = document.getElementById('caja-filter-buscar').value.trim();
+
+  const params = new URLSearchParams({ pagina: cajaPagina });
+  if (tipo)   params.append('tipo', tipo);
+  if (anio)   params.append('anio', anio);
+  if (mes)    params.append('mes', parseInt(mes).toString());
+  if (buscar) params.append('buscar', buscar);
+
+  const res = await api('caja.php?' + params.toString());
+  const movs       = res.movimientos;
+  const saldoTotal = res.saldo_total;
+  const totalPags  = res.total_pags;
+  const totalFilas = res.total_filas;
+
+  const ingresos = movs.filter(m=>m.tipo==='ingreso').reduce((s,m)=>s+parseFloat(m.importe),0);
+  const egresos  = movs.filter(m=>m.tipo==='egreso').reduce((s,m)=>s+parseFloat(m.importe),0);
+  document.getElementById('caja-saldo').textContent    = fmt(saldoTotal);
+  document.getElementById('caja-ingresos').textContent = fmt(ingresos);
+  document.getElementById('caja-egresos').textContent  = fmt(egresos);
+
+  document.getElementById('caja-table').innerHTML = movs.map(m => `
+    <tr>
+      <td class="mono">${m.fecha}</td>
+      <td>${m.concepto}${m.notas?'<br><small style="color:var(--text3)">'+m.notas+'</small>':''}</td>
+      <td>${m.unidad_nombre?'<span class="tag">'+m.unidad_nombre+'</span>':'<span style="color:var(--text3)">—</span>'}</td>
+      <td><span class="badge ${m.tipo==='ingreso'?'badge-green':'badge-red'}">${m.tipo==='ingreso'?'Ingreso':'Egreso'}</span></td>
+      <td class="mono" style="color:${m.tipo==='ingreso'?'var(--success)':'var(--danger)'}">
+        ${m.tipo==='ingreso'?'+':'-'} ${fmt(m.importe)}
+      </td>
+      <td><button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="deleteMovimiento(${m.id})">✕</button></td>
+    </tr>`).join('') || '<tr><td colspan="6"><div class="empty-state" style="padding:24px"><div class="emoji" style="font-size:28px">◑</div><p>Sin movimientos.</p></div></td></tr>';
+
+  const pag = document.getElementById('caja-paginacion');
+  if (totalPags <= 1) {
+    pag.innerHTML = `<span style="color:var(--text3);font-size:13px">${totalFilas} movimiento${totalFilas!==1?'s':''}</span>`;
+  } else {
+    const prev = cajaPagina > 1
+      ? `<button class="btn btn-secondary btn-sm" onclick="cajaPagina--;renderCaja()">← Anterior</button>`
+      : `<button class="btn btn-secondary btn-sm" disabled>← Anterior</button>`;
+    const next = cajaPagina < totalPags
+      ? `<button class="btn btn-secondary btn-sm" onclick="cajaPagina++;renderCaja()">Siguiente →</button>`
+      : `<button class="btn btn-secondary btn-sm" disabled>Siguiente →</button>`;
+    pag.innerHTML = `<div style="display:flex;align-items:center;gap:12px;justify-content:center">
+      ${prev}
+      <span style="font-size:13px;color:var(--text3)">Página ${cajaPagina} de ${totalPags} · ${totalFilas} movimientos</span>
+      ${next}
+    </div>`;
+  }
+}
+
+function openModalMovimiento() {
+  const now = new Date();
+  document.getElementById('mov-fecha').value = now.toISOString().split('T')[0];
+  document.getElementById('mov-concepto').value = '';
+  document.getElementById('mov-importe').value = '';
+  document.getElementById('mov-notas').value = '';
+  document.getElementById('mov-tipo-group').querySelectorAll('.radio-item').forEach(r=>r.classList.remove('selected'));
+  document.getElementById('mov-tipo-group').querySelector('.radio-item:first-child').classList.add('selected');
+  const sel = document.getElementById('mov-unidad');
+  sel.innerHTML = '<option value="">— No aplica —</option>';
+  unidades.forEach(u => { const o=document.createElement('option'); o.value=u.id; o.textContent=u.nombre; sel.appendChild(o); });
+  sel.value = '';
+  sel.onchange = toggleUnidadField;
+  const perYear = document.getElementById('mov-per-year');
+  if (!perYear._init) {
+    perYear._init = true;
+    for (let y = now.getFullYear(); y >= 2020; y--) {
+      const o = document.createElement('option'); o.value = y; o.textContent = y; perYear.appendChild(o);
+    }
+  }
+  perYear.value = now.getFullYear();
+  document.getElementById('mov-per-month').value = String(now.getMonth()+1).padStart(2,'0');
+  toggleUnidadField();
+  openModal('modal-movimiento');
+}
+
+function toggleUnidadField() {
+  const tipoSel = getRadioValue('mov-tipo-group');
+  const unidadSel = document.getElementById('mov-unidad').value;
+  document.getElementById('mov-periodo-row').style.display = (tipoSel==='ingreso' && unidadSel) ? 'block' : 'none';
+}
+
+async function guardarMovimiento() {
+  const fecha = document.getElementById('mov-fecha').value;
+  const tipo = getRadioValue('mov-tipo-group');
+  const concepto = document.getElementById('mov-concepto').value.trim();
+  const importe = parseFloat(document.getElementById('mov-importe').value);
+  const unidad_id = document.getElementById('mov-unidad').value || null;
+  const notas = document.getElementById('mov-notas').value.trim();
+  let periodo = null;
+  if (tipo==='ingreso' && unidad_id) {
+    periodo = document.getElementById('mov-per-year').value + document.getElementById('mov-per-month').value;
+  }
+  if (!fecha || !tipo || !concepto || isNaN(importe) || importe <= 0) {
+    alert('Completá los campos obligatorios. El importe debe ser mayor a cero.');
+    return;
+  }
+  const btn = document.querySelector('#modal-movimiento .btn-primary');
+  btn.disabled = true;
+  try {
+    await api('caja.php', 'POST', {fecha, tipo, concepto, importe, unidad_id, periodo, notas});
+    closeModal('modal-movimiento');
+    cajaPagina = 1;
+    renderCaja();
+    toast('Movimiento registrado');
+  } catch(e) {
+    alert(e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function deleteMovimiento(id) {
+  confirmDialog('Eliminar movimiento', '¿Eliminás este movimiento de caja?', async () => {
+    await api('caja.php?id='+id, 'DELETE');
+    renderCaja();
+    toast('Movimiento eliminado');
+  });
+}
+
+// ── Cuenta Corriente ──
+async function renderCuentaCorriente() {
+  const periodo = getPeriodo('cc');
+  const data = await api('cuenta_corriente.php?periodo='+periodo);
+  const cont = document.getElementById('cc-content');
+  if (!data.length) {
+    cont.innerHTML = '<div class="alert alert-info">ℹ No hay cuenta corriente para este período. Calculá la liquidación primero.</div>';
+    return;
+  }
+  const totalDeuda    = data.reduce((s,r)=>s+parseFloat(r.deuda),0);
+  const totalPagado   = data.reduce((s,r)=>s+parseFloat(r.pagado),0);
+  const totalSaldoFin = data.reduce((s,r)=>s+parseFloat(r.saldo_final),0);
+  cont.innerHTML = `
+    <div class="grid-3" style="margin-bottom:20px">
+      <div class="stat-card"><div class="stat-label">Total liquidado</div><div class="stat-value" style="font-size:20px">${fmt(totalDeuda)}</div></div>
+      <div class="stat-card"><div class="stat-label">Total cobrado</div><div class="stat-value" style="font-size:20px;color:var(--success)">${fmt(totalPagado)}</div></div>
+      <div class="stat-card"><div class="stat-label">Saldo pendiente</div><div class="stat-value" style="font-size:20px;color:${totalSaldoFin>0?'var(--danger)':'var(--success)'}">${fmt(totalSaldoFin)}</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Estado por unidad — ${periodLabel(periodo)}</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Unidad</th><th>Saldo anterior</th><th>Deuda del mes</th><th>Extraordinario</th><th>Pagado</th><th>Saldo final</th><th>Estado</th></tr></thead>
+          <tbody>
+            ${data.map(r => {
+              const sf = parseFloat(r.saldo_final);
+              const badge = sf <= 0
+                ? '<span class="badge badge-green">Al día</span>'
+                : '<span class="badge badge-red">Debe ' + fmt(sf) + '</span>';
+              return `<tr>
+                <td><strong>${r.nombre}</strong><br><small style="color:var(--text3)">${r.propietario||''}</small></td>
+                <td class="mono" style="color:${parseFloat(r.saldo_anterior)>0?'var(--danger)':parseFloat(r.saldo_anterior)<0?'var(--success)':'var(--text2)'}">${fmt(r.saldo_anterior)}</td>
+                <td class="mono">${fmt(r.deuda)}</td>
+                <td class="mono" style="color:${parseFloat(r.extraordinario)>0?'var(--accent2)':'var(--text3)'}">${fmt(r.extraordinario)}</td>
+                <td class="mono" style="color:var(--success)">${fmt(r.pagado)}</td>
+                <td class="mono" style="color:${sf>0?'var(--danger)':sf<0?'var(--success)':'var(--text)'};font-weight:600">${fmt(sf)}</td>
+                <td>${badge}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+// ── Exportar Caja ──
+function exportarCaja() {
+  window.open('api/exportar_caja.php', '_blank');
+}
+
+// ── Cuenta Corriente por Unidad ──
+async function renderCuentaCorrienteUnidad() {
+  const unidadId = document.getElementById('cc-unidad').value;
+  const content = document.getElementById('cc-unidad-content');
+  const btnExportar = document.getElementById('btn-exportar-cc');
+  
+  if (!unidadId) {
+    content.innerHTML = '';
+    btnExportar.style.display = 'none';
+    return;
+  }
+  
+  btnExportar.style.display = 'inline-block';
+  
+  const data = await api(`cuenta_corriente.php?unidad_id=${unidadId}`);
+  
+  if (!data || data.length === 0) {
+    content.innerHTML = '<div class="alert alert-warning">Esta unidad no tiene movimientos registrados en cuenta corriente.</div>';
+    return;
+  }
+  
+  const unidad = unidades.find(u => u.id == unidadId);
+  const meses = {'01':'Enero','02':'Febrero','03':'Marzo','04':'Abril','05':'Mayo','06':'Junio',
+                 '07':'Julio','08':'Agosto','09':'Septiembre','10':'Octubre','11':'Noviembre','12':'Diciembre'};
+  
+  content.innerHTML = `
+    <div style="margin-bottom:16px;padding:16px;background:var(--bg2);border-radius:8px">
+      <div style="font-size:18px;font-weight:600;margin-bottom:4px">${unidad.nombre}</div>
+      <div style="color:var(--text3);font-size:14px">${unidad.propietario || '—'}</div>
+      ${unidad.email ? `<div style="color:var(--text3);font-size:13px">${unidad.email}</div>` : ''}
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Período</th><th>Saldo anterior</th><th>Deuda del mes</th><th>Extraordinario</th><th>Pagado</th><th>Saldo final</th><th>Estado</th></tr></thead>
+        <tbody>
+          ${data.map(r => {
+            const mesNum = r.periodo.substring(4, 6);
+            const anio = r.periodo.substring(0, 4);
+            const periodoLabel = meses[mesNum] + ' ' + anio;
+            const sf = parseFloat(r.saldo_final);
+            const badge = sf <= 0
+              ? '<span class="badge badge-green">Al día</span>'
+              : '<span class="badge badge-red">Debe ' + fmt(sf) + '</span>';
+            return `<tr>
+              <td><strong>${periodoLabel}</strong></td>
+              <td class="mono" style="color:${parseFloat(r.saldo_anterior)>0?'var(--danger)':parseFloat(r.saldo_anterior)<0?'var(--success)':'var(--text2)'}">${fmt(r.saldo_anterior)}</td>
+              <td class="mono">${fmt(r.deuda)}</td>
+              <td class="mono" style="color:${parseFloat(r.extraordinario)>0?'var(--accent2)':'var(--text3)'}">${fmt(r.extraordinario)}</td>
+              <td class="mono" style="color:var(--success)">${fmt(r.pagado)}</td>
+              <td class="mono" style="color:${sf>0?'var(--danger)':sf<0?'var(--success)':'var(--text)'};font-weight:600">${fmt(sf)}</td>
+              <td>${badge}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function exportarCuentaCorrienteUnidad() {
+  const unidadId = document.getElementById('cc-unidad').value;
+  if (!unidadId) {
+    alert('Selecciona una unidad primero');
+    return;
+  }
+  window.open(`api/exportar_cuenta_corriente.php?unidad_id=${unidadId}`, '_blank');
+}
+
+// ── Backup ──
+function exportBackup() {
+  window.open('api/backup.php', '_blank');
+}
+
+let backupFile = null;
+
+function initBackup() {
+  const zone = document.getElementById('backup-dropzone');
+  if (!zone || zone._init) return;
+  zone._init = true;
+  zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f && f.name.toLowerCase().endsWith('.sql')) setBackupFile(f);
+    else toast('Solo se aceptan archivos .sql', 'err');
+  });
+}
+
+function onBackupFileSelect(e) {
+  const f = e.target.files[0];
+  if (f) setBackupFile(f);
+}
+
+function setBackupFile(file) {
+  backupFile = file;
+  const kb   = (file.size / 1024).toFixed(1);
+  const info = document.getElementById('backup-file-info');
+  info.style.display = 'flex';
+  info.innerHTML = `
+    <span class="tag">📄 ${file.name}</span>
+    <span style="color:var(--text3);font-size:12px;font-family:'DM Mono',monospace">${kb} KB</span>
+    <button class="btn btn-ghost btn-sm" style="color:var(--danger);margin-left:auto" onclick="clearBackupFile()">✕ Quitar</button>`;
+  document.getElementById('btn-import-backup').disabled = false;
+  document.getElementById('backup-dropzone').classList.add('has-file');
+}
+
+function clearBackupFile() {
+  backupFile = null;
+  document.getElementById('backup-file').value = '';
+  document.getElementById('backup-file-info').style.display = 'none';
+  document.getElementById('btn-import-backup').disabled = true;
+  document.getElementById('backup-dropzone').classList.remove('has-file');
+}
+
+function importBackup() {
+  if (!backupFile) return;
+  confirmDialog(
+    'Restaurar base de datos',
+    `Se reemplazará TODA la base de datos con el archivo "${backupFile.name}". Los datos actuales se perderán.`,
+    async () => {
+      const btn  = document.getElementById('btn-import-backup');
+      const orig = btn.innerHTML;
+      btn.innerHTML = '<span class="spinner"></span> Restaurando...';
+      btn.disabled  = true;
+      const fd = new FormData();
+      fd.append('backup', backupFile);
+      try {
+        const r    = await fetch('api/backup.php', { method: 'POST', body: fd });
+        const data = await r.json();
+        if (!data.ok) throw new Error(data.error);
+        toast(`✓ Base restaurada — ${data.data.sentencias} sentencias ejecutadas`);
+        clearBackupFile();
+      } catch(e) {
+        toast('Error: ' + e.message, 'err');
+        btn.innerHTML = orig;
+        btn.disabled  = false;
+      }
+    }
+  );
+}
+
+// ── Init ──
+(async()=>{
+  unidades=await api('unidades.php');
+  
+  // Poblar selector de unidades en cuenta corriente
+  const ccUnidadSelect = document.getElementById('cc-unidad');
+  unidades.forEach(u => {
+    const opt = document.createElement('option');
+    opt.value = u.id;
+    opt.textContent = u.nombre;
+    ccUnidadSelect.appendChild(opt);
+  });
+  
+  renderDashboard();
+})();
+</script>
+</body>
+</html>

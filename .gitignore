@@ -1,0 +1,32 @@
+# ─── Credenciales (nunca al repositorio) ───
+.env
+.env.local
+
+# ─── Iconos: son fotos del edificio real, identifican la ubicación ───
+# Quedan en tu copia local, pero no se publican. Ver README.
+apple-touch-icon.png
+favicon.ico
+favicon.svg
+favicon-96x96.png
+web-app-manifest-192x192.png
+web-app-manifest-512x512.png
+
+# ─── Backups de la base: contienen datos personales de los propietarios ───
+Deploy base de datos/*.sql
+!Deploy base de datos/database.sql
+!Deploy base de datos/migracion_*.sql
+*_backup_*.sql
+edificio_backup_*.sql
+
+# ─── Logs y temporales ───
+*.log
+*.tmp
+*.bak
+*~
+
+# ─── Sistema operativo / editores ───
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/

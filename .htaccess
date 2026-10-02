@@ -1,0 +1,12 @@
+# Impide que el navegador pueda leer archivos sensibles que están
+# dentro de la raíz web (Apache 2.4 / XAMPP).
+
+# Credenciales
+<FilesMatch "^\.env">
+    Require all denied
+</FilesMatch>
+
+# Volcados de base de datos (datos personales de los propietarios)
+<FilesMatch "\.(sql|sql\.gz|bak)$">
+    Require all denied
+</FilesMatch>
