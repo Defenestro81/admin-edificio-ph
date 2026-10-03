@@ -231,23 +231,49 @@ function migraciones(): array {
         [
             'version' => '004',
             'nombre'  => 'Roles de usuario y trazabilidad',
+            // Mismo criterio que la 002: cada paso pregunta antes. Esta
+            // migración puede encontrarse con la mitad del cambio aplicado si
+            // se restauró un backup viejo, porque el volcado reemplaza algunas
+            // tablas y deja otras intactas. MySQL no admite "IF NOT EXISTS" en
+            // ADD COLUMN ni en ADD CONSTRAINT.
             'sql'     => [
                 // 'admin' hace todo; 'consulta' solo lee.
-                "ALTER TABLE usuarios
-                    ADD COLUMN rol ENUM('admin','consulta') NOT NULL DEFAULT 'admin' AFTER nombre,
-                    ADD COLUMN activo TINYINT(1) NOT NULL DEFAULT 1 AFTER rol",
+                function (PDO $db): void {
+                    $partes = [];
+                    if (!columnaExiste($db, 'usuarios', 'rol')) {
+                        $partes[] = "ADD COLUMN rol ENUM('admin','consulta') NOT NULL DEFAULT 'admin' AFTER nombre";
+                    }
+                    if (!columnaExiste($db, 'usuarios', 'activo')) {
+                        $partes[] = 'ADD COLUMN activo TINYINT(1) NOT NULL DEFAULT 1 AFTER rol';
+                    }
+                    if ($partes !== []) {
+                        $db->exec('ALTER TABLE usuarios ' . implode(', ', $partes));
+                    }
+                },
 
                 // Quién cargó cada movimiento de caja. ON DELETE SET NULL para que
                 // dar de baja un usuario nunca borre un asiento contable.
-                "ALTER TABLE caja
-                    ADD COLUMN usuario_id INT NULL DEFAULT NULL,
-                    ADD CONSTRAINT fk_caja_usuario
-                        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL",
+                function (PDO $db): void {
+                    if (!columnaExiste($db, 'caja', 'usuario_id')) {
+                        $db->exec('ALTER TABLE caja ADD COLUMN usuario_id INT NULL DEFAULT NULL');
+                    }
+                    if (!restriccionExiste($db, 'caja', 'fk_caja_usuario')) {
+                        $db->exec('ALTER TABLE caja
+                            ADD CONSTRAINT fk_caja_usuario
+                                FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL');
+                    }
+                },
 
-                "ALTER TABLE liquidaciones
-                    ADD COLUMN usuario_id INT NULL DEFAULT NULL,
-                    ADD CONSTRAINT fk_liquidaciones_usuario
-                        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL",
+                function (PDO $db): void {
+                    if (!columnaExiste($db, 'liquidaciones', 'usuario_id')) {
+                        $db->exec('ALTER TABLE liquidaciones ADD COLUMN usuario_id INT NULL DEFAULT NULL');
+                    }
+                    if (!restriccionExiste($db, 'liquidaciones', 'fk_liquidaciones_usuario')) {
+                        $db->exec('ALTER TABLE liquidaciones
+                            ADD CONSTRAINT fk_liquidaciones_usuario
+                                FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL');
+                    }
+                },
             ],
         ],
 
@@ -336,6 +362,15 @@ function indiceExiste(PDO $db, string $tabla, string $indice): bool {
     return (bool) $st->fetchColumn();
 }
 
+/** Existe una restricción (clave ajena, única, primaria) con ese nombre. */
+function restriccionExiste(PDO $db, string $tabla, string $nombre): bool {
+    $st = $db->prepare('SELECT 1 FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+                         WHERE TABLE_SCHEMA = DATABASE()
+                           AND TABLE_NAME = ? AND CONSTRAINT_NAME = ?');
+    $st->execute([$tabla, $nombre]);
+    return (bool) $st->fetchColumn();
+}
+
 /** Expresión de una columna generada, o null si no lo es o no existe. */
 function expresionGenerada(PDO $db, string $tabla, string $columna): ?string {
     $st = $db->prepare('SELECT GENERATION_EXPRESSION FROM INFORMATION_SCHEMA.COLUMNS
@@ -363,6 +398,57 @@ function migracionesInit(PDO $db): bool {
 }
 
 /**
+ * ¿El esquema real tiene aplicada esta migración? Mira la base, no el registro.
+ *
+ * Una migración se da por aplicada solo si están TODAS las piezas que crea.
+ * Alcanzaba con mirar una sola tabla, pero si la base venía incompleta —por
+ * ejemplo con "unidades" pero sin "plantilla_mail"— quedaba registrada igual y
+ * esa tabla no se creaba nunca: el motor ya no la vuelve a mirar.
+ *
+ * Devuelve null si la versión no se puede determinar por esquema, lo que pasa
+ * con cualquier migración futura que no agregue estructura detectable.
+ */
+function migracionAplicadaEnEsquema(PDO $db, string $version): ?bool {
+    switch ($version) {
+        case '001':
+            $tablas = [
+                'unidades', 'gastos_fijos', 'gastos_fijos_unidades',
+                'gastos_esporadicos', 'gastos_esporadicos_unidades',
+                'liquidaciones', 'liquidacion_detalle', 'liquidacion_lineas',
+                'caja', 'cuenta_corriente', 'plantilla_mail',
+            ];
+            return array_filter($tablas, fn($t) => !tablaExiste($db, $t)) === [];
+
+        case '002':
+            // Las tres piezas: la columna de tipo, la de cargos extraordinarios
+            // y la fórmula de saldo_final ya redefinida. Darla por aplicada con
+            // una sola de las tres dejaba saldos mal calculados sin aviso.
+            $expr = expresionGenerada($db, 'cuenta_corriente', 'saldo_final');
+            return columnaExiste($db, 'liquidaciones', 'tipo')
+                && columnaExiste($db, 'cuenta_corriente', 'extraordinario')
+                && $expr !== null && str_contains($expr, 'extraordinario');
+
+        case '003':
+            return tablaExiste($db, 'usuarios');
+
+        case '004':
+            return columnaExiste($db, 'usuarios', 'rol')
+                && columnaExiste($db, 'usuarios', 'activo')
+                && columnaExiste($db, 'caja', 'usuario_id')
+                && columnaExiste($db, 'liquidaciones', 'usuario_id');
+
+        case '005':
+            return tablaExiste($db, 'edificio');
+
+        case '006':
+            return tablaExiste($db, 'intentos_login')
+                && tablaExiste($db, 'bloqueos_acceso');
+    }
+
+    return null;
+}
+
+/**
  * Para bases que ya existían antes de que hubiera migraciones: detecta qué
  * partes del esquema ya están y las marca como aplicadas, para no reintentar
  * ALTERs que fallarían. Solo corre la primera vez.
@@ -370,43 +456,54 @@ function migracionesInit(PDO $db): bool {
 function migracionesBaseline(PDO $db): array {
     $marcadas = [];
 
-    // Una migración solo se da por aplicada si están TODAS las piezas que crea.
-    // Alcanzaba con mirar una sola tabla, pero si la base venía incompleta —por
-    // ejemplo con "unidades" pero sin "plantilla_mail"— quedaba registrada igual
-    // y esa tabla no se creaba nunca: el motor ya no la vuelve a mirar.
-    $tablas001 = [
-        'unidades', 'gastos_fijos', 'gastos_fijos_unidades',
-        'gastos_esporadicos', 'gastos_esporadicos_unidades',
-        'liquidaciones', 'liquidacion_detalle', 'liquidacion_lineas',
-        'caja', 'cuenta_corriente', 'plantilla_mail',
-    ];
-
-    $faltantes001 = array_filter($tablas001, fn($t) => !tablaExiste($db, $t));
-
     // Base vacía o a medias: que corran las migraciones desde cero. Los
     // CREATE TABLE de 001 llevan IF NOT EXISTS, así que completar lo que falta
     // es seguro aunque parte ya esté.
-    if ($faltantes001 !== []) return $marcadas;
+    if (migracionAplicadaEnEsquema($db, '001') !== true) return $marcadas;
 
-    $marcadas[] = '001';
+    foreach (migraciones() as $m) {
+        if (migracionAplicadaEnEsquema($db, $m['version']) !== true) continue;
 
-    // 002 solo si está completa: la columna de tipo, la de cargos
-    // extraordinarios y la fórmula de saldo_final ya redefinida. Marcarla con
-    // una sola de las tres dejaba saldos mal calculados sin aviso.
-    $expr = expresionGenerada($db, 'cuenta_corriente', 'saldo_final');
-    $completa002 = columnaExiste($db, 'liquidaciones', 'tipo')
-                && columnaExiste($db, 'cuenta_corriente', 'extraordinario')
-                && $expr !== null && str_contains($expr, 'extraordinario');
-
-    if ($completa002) $marcadas[] = '002';
-
-    $todas = array_column(migraciones(), null, 'version');
-    foreach ($marcadas as $v) {
         $st = $db->prepare('INSERT IGNORE INTO migraciones (version, nombre) VALUES (?, ?)');
-        $st->execute([$v, $todas[$v]['nombre'] ?? 'baseline']);
+        $st->execute([$m['version'], $m['nombre']]);
+        $marcadas[] = $m['version'];
     }
 
     return $marcadas;
+}
+
+/**
+ * Compara el registro contra el esquema real y corrige el registro.
+ *
+ * Hace falta porque restaurar un backup puede dejar los dos desincronizados:
+ * el volcado reemplaza las tablas que contiene y deja intactas las que no,
+ * pero la tabla `migraciones` suele estar entre las que sobreviven. Entonces
+ * el registro sigue afirmando que todo está aplicado mientras el esquema
+ * volvió atrás, nadie encuentra nada pendiente, y la base queda mal en
+ * silencio: por ejemplo saldo_final sin "+ extraordinario".
+ *
+ * Solo borra filas que mienten; nunca toca el esquema. Las versiones que no se
+ * pueden determinar por esquema se dejan como están, porque no hay forma de
+ * saber si corrieron.
+ *
+ * Devuelve las versiones que se desmarcaron, que quedan pendientes.
+ */
+function migracionesReconciliar(PDO $db): array {
+    migracionesInit($db);
+
+    $aplicadas    = migracionesAplicadas($db);
+    $desmarcadas  = [];
+
+    foreach (migraciones() as $m) {
+        $v = $m['version'];
+        if (!in_array($v, $aplicadas, true)) continue;
+        if (migracionAplicadaEnEsquema($db, $v) !== false) continue;
+
+        $db->prepare('DELETE FROM migraciones WHERE version = ?')->execute([$v]);
+        $desmarcadas[] = $v;
+    }
+
+    return $desmarcadas;
 }
 
 /** Versiones ya aplicadas. */

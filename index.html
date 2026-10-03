@@ -117,6 +117,16 @@
     </div>
     <div class="content">
 
+      <!-- Aviso de esquema desactualizado. Lo puebla revisarMigraciones() y
+           solo aparece para administradores: el endpoint responde 403 al rol
+           'consulta', que además no podría hacer nada al respecto. -->
+      <div id="aviso-migraciones" class="alert alert-warning solo-admin" hidden>
+        <strong>La estructura de la base está atrasada.</strong>
+        <span id="aviso-migraciones-detalle"></span>
+        <button class="btn btn-secondary btn-sm" style="margin-left:10px"
+                onclick="aplicarMigraciones()">Actualizar ahora</button>
+      </div>
+
       <!-- DASHBOARD -->
       <div id="page-dashboard" class="page active">
         <div class="grid-3" style="margin-bottom:24px">
@@ -2338,6 +2348,49 @@ function importBackup() {
 // ── Init ──
 
 /** Carga los datos y deja la app lista. Se llama recién con sesión abierta. */
+
+// ═══════════════════════════════════════════════════════════════
+//  Estado del esquema
+//
+//  Las migraciones corrían solo desde instalar.php, que se autobloquea en
+//  cuanto existe un .env: una instalación en uso no tenía forma de aplicar
+//  una migración nueva. Esto avisa y da el botón para hacerlo.
+// ═══════════════════════════════════════════════════════════════
+
+async function revisarMigraciones() {
+  const aviso = document.getElementById('aviso-migraciones');
+  if (!esAdmin()) { aviso.hidden = true; return; }
+
+  try {
+    const d = await api('migraciones.php');
+    const n = d.pendientes.length;
+    if (!n) { aviso.hidden = true; return; }
+
+    const versiones = d.pendientes.map(m => m.version).join(', ');
+    document.getElementById('aviso-migraciones-detalle').textContent =
+      n === 1 ? ` Falta aplicar la migración ${versiones}.`
+              : ` Faltan aplicar ${n} migraciones: ${versiones}.`;
+    aviso.hidden = false;
+  } catch (e) {
+    // Que no se caiga el arranque de la app por no poder consultar esto.
+    aviso.hidden = true;
+  }
+}
+
+async function aplicarMigraciones() {
+  if (!confirm('Se van a aplicar los cambios pendientes en la estructura de la base.\n\nConviene tener un backup reciente antes de seguir.\n\n¿Continuar?')) return;
+
+  try {
+    const d = await api('migraciones.php', 'POST', {});
+    const n = d.corridas.length;
+    toast(n === 0 ? 'No había nada pendiente'
+        : n === 1 ? 'Se aplicó la migración'
+        : `Se aplicaron ${n} migraciones`);
+    await revisarMigraciones();
+  } catch (e) {
+    toast(e.message || 'No se pudo actualizar la base', 'err');
+  }
+}
 async function iniciarApp() {
   await cargarEdificio();
   unidades = await api('unidades.php');
@@ -2353,6 +2406,7 @@ async function iniciarApp() {
   });
 
   renderDashboard();
+  revisarMigraciones();
 }
 
 /** Decide qué mostrar al abrir la página: alta inicial, login o la app. */

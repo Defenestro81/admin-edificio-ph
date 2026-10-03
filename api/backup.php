@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/migraciones.php';
 
 // Exporta y restaura la base completa: ambas operaciones son de administrador,
 // así que se exige el rol en cualquier método, no solo en las escrituras.
@@ -104,11 +105,34 @@ function importar(): void {
         }
 
         $db->exec('SET FOREIGN_KEY_CHECKS=1');
-        json_ok(['sentencias' => $ejecutadas]);
     } catch (PDOException $e) {
         $db->exec('SET FOREIGN_KEY_CHECKS=1');
         json_err('Error al restaurar: ' . $e->getMessage());
     }
+
+    // Un volcado reemplaza las tablas que contiene y deja intactas las que no.
+    // Un backup viejo puede entonces revertir parte del esquema mientras la
+    // tabla `migraciones` sobrevive afirmando que todo sigue aplicado: nadie
+    // encuentra nada pendiente y la base queda atrasada en silencio, por
+    // ejemplo con saldo_final sin "+ extraordinario" y los saldos mal
+    // calculados. Reconciliar compara el registro contra el esquema real, y
+    // después se aplica lo que haya quedado pendiente.
+    //
+    // Esto tiene que pasar acá porque el instalador, que era el único que
+    // corría migraciones, se niega a funcionar mientras exista el .env.
+    try {
+        $revertidas = migracionesReconciliar($db);
+        $corridas   = array_column(migracionesAplicar($db), 'version');
+    } catch (Throwable $e) {
+        error_log('Restauración completa pero falló la actualización del esquema: ' . $e->getMessage());
+        json_err('Se restauraron los datos, pero no se pudo actualizar el esquema: ' . $e->getMessage(), 500);
+    }
+
+    json_ok([
+        'sentencias'  => $ejecutadas,
+        'revertidas'  => $revertidas,
+        'migraciones' => $corridas,
+    ]);
 }
 
 // ── Utilidad: divide SQL en sentencias individuales ──────────────────────────
