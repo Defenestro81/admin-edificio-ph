@@ -210,6 +210,31 @@ function migraciones(): array {
             ],
         ],
 
+        // ── 005 — Datos del edificio administrado ──────────────────
+        [
+            'version' => '005',
+            'nombre'  => 'Datos del edificio',
+            'sql'     => [
+                // Una sola fila (id = 1), como plantilla_mail. Saca de los
+                // archivos el nombre y la foto, que son propios de cada
+                // instalación y no deben vivir en el repositorio.
+                "CREATE TABLE IF NOT EXISTS edificio (
+                    id TINYINT UNSIGNED PRIMARY KEY,
+                    nombre VARCHAR(150) NOT NULL DEFAULT '',
+                    direccion VARCHAR(200) NULL,
+                    localidad VARCHAR(100) NULL,
+                    cuit VARCHAR(20) NULL,
+                    administrador VARCHAR(150) NULL,
+                    email_contacto VARCHAR(150) NULL,
+                    telefono VARCHAR(50) NULL,
+                    foto VARCHAR(255) NULL,
+                    actualizado_en DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                )",
+
+                "INSERT IGNORE INTO edificio (id, nombre) VALUES (1, 'Administración de Edificio')",
+            ],
+        ],
+
     ];
 }
 

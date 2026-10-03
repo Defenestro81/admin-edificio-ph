@@ -1,0 +1,13 @@
+# Este directorio recibe archivos subidos desde la aplicación. Si Apache
+# ejecutara PHP acá, cualquier falla en la validación de subida se convertiría
+# en ejecución remota de código. Se apaga el motor y se limita a imágenes.
+
+php_flag engine off
+
+<FilesMatch "\.(php|phtml|php3|php4|php5|php7|phps|pht|inc|cgi|pl|py|sh|htaccess)$">
+    Require all denied
+</FilesMatch>
+
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+</IfModule>

@@ -2,6 +2,14 @@
 .env
 .env.local
 
+# ─── Archivos subidos desde la app (foto del edificio) ───
+# Misma razón que los iconos: identifican la propiedad real. Se conserva la
+# estructura del directorio y su .htaccess, no el contenido.
+uploads/**
+!uploads/.htaccess
+!uploads/edificio/
+!uploads/edificio/.gitkeep
+
 # ─── Iconos: son fotos del edificio real, identifican la ubicación ───
 # Quedan en tu copia local, pero no se publican. Ver README.
 apple-touch-icon.png

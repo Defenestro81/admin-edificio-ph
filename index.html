@@ -20,7 +20,7 @@
 <div id="auth-overlay" class="auth-overlay">
   <div class="auth-box">
     <div class="auth-logo">
-      <h1>Admin Edificio</h1>
+      <h1 id="auth-logo-nombre">Admin Edificio</h1>
       <p id="auth-sub">Ingresá para continuar</p>
     </div>
 
@@ -68,8 +68,9 @@
 <div class="app">
   <aside class="sidebar">
     <div class="sidebar-logo">
-      <h1>Admin<br>Edificio</h1>
+      <h1>Admin Edificio</h1>
       <p id="sidebar-sub"></p>
+      <div class="sidebar-foto" id="sidebar-foto" hidden></div>
     </div>
     <div class="nav-section">
       <div class="nav-label">General</div>
@@ -94,6 +95,7 @@
     </div>
     <div class="nav-section">
       <div class="nav-label">Sistema</div>
+      <div class="nav-item solo-admin" onclick="navigate('configuracion')"><span class="nav-icon">⚙</span> Configuración</div>
       <div class="nav-item solo-admin" onclick="navigate('usuarios')"><span class="nav-icon">◍</span> Usuarios</div>
       <div class="nav-item solo-admin" onclick="navigate('backup')"><span class="nav-icon">◧</span> Backup</div>
       <div class="nav-item" onclick="navigate('cuenta')"><span class="nav-icon">◉</span> Mi Cuenta</div>
@@ -379,6 +381,82 @@
             </button>
           </div>
 
+        </div>
+      </div>
+
+      <!-- CONFIGURACIÓN -->
+      <div id="page-configuracion" class="page">
+        <div class="alert alert-info" style="margin-bottom:24px">
+          ℹ Estos datos identifican al edificio que administrás. Se guardan en tu base,
+          no en los archivos del sistema, así que no se publican si compartís el código.
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">⚙ Datos del edificio</div>
+            <div class="form-group">
+              <label class="form-label" for="cfg-nombre">Nombre *</label>
+              <input class="form-control" id="cfg-nombre" placeholder="Edificio Ejemplo 123" maxlength="150">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="cfg-direccion">Dirección</label>
+              <input class="form-control" id="cfg-direccion" placeholder="Calle 1234" maxlength="200">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="cfg-localidad">Localidad</label>
+              <input class="form-control" id="cfg-localidad" placeholder="Ciudad, Provincia" maxlength="100">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="cfg-cuit">CUIT del consorcio</label>
+              <input class="form-control" id="cfg-cuit" placeholder="30-12345678-9" maxlength="20">
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">◉ Administración</div>
+            <div class="form-group">
+              <label class="form-label" for="cfg-administrador">Administrador</label>
+              <input class="form-control" id="cfg-administrador" placeholder="Nombre del administrador" maxlength="150">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="cfg-email">Email de contacto</label>
+              <input class="form-control" id="cfg-email" type="email" placeholder="contacto@ejemplo.com" maxlength="150">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="cfg-telefono">Teléfono</label>
+              <input class="form-control" id="cfg-telefono" placeholder="11 1234-5678" maxlength="50">
+            </div>
+            <button class="btn btn-primary" onclick="guardarConfiguracion()">Guardar datos</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">▣ Foto del edificio</div>
+          <p style="color:var(--text2);font-size:13px;line-height:1.7;margin-bottom:20px">
+            Se muestra en esta pantalla y en la barra lateral. Al subirla se reduce a
+            1200&nbsp;px y se vuelve a codificar, lo que <strong>elimina los metadatos
+            EXIF</strong> del original — en una foto sacada con celular, esos metadatos
+            incluyen las coordenadas GPS del lugar.
+          </p>
+
+          <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
+            <div id="cfg-foto-preview" class="foto-preview foto-preview-vacia">Sin foto</div>
+            <div style="flex:1;min-width:240px">
+              <input type="file" id="cfg-foto-input" accept="image/jpeg,image/png,image/webp" hidden
+                     onchange="subirFotoEdificio(event)">
+              <div style="display:flex;gap:10px;flex-wrap:wrap">
+                <button class="btn btn-secondary" onclick="document.getElementById('cfg-foto-input').click()">
+                  Elegir imagen…
+                </button>
+                <button class="btn btn-ghost" style="color:var(--danger)" id="cfg-foto-quitar"
+                        onclick="quitarFotoEdificio()" hidden>Quitar foto</button>
+              </div>
+              <div style="font-size:11px;color:var(--text3);margin-top:10px;font-family:'DM Mono',monospace">
+                JPG, PNG o WEBP · máximo 8 MB
+              </div>
+              <div id="cfg-foto-estado" style="font-size:12px;margin-top:10px"></div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -880,6 +958,140 @@ function renderCuenta() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+//  Configuración del edificio
+// ═══════════════════════════════════════════════════════════════
+
+let edificio = null;
+
+/** Trae los datos del edificio y los vuelca en la barra lateral y el título. */
+async function cargarEdificio() {
+  try {
+    edificio = await api('edificio.php');
+  } catch (e) {
+    return;   // si falla, la app sigue con los textos por defecto
+  }
+
+  const nombre = edificio.nombre || 'Administración de Edificio';
+
+  document.getElementById('sidebar-sub').textContent = edificio.direccion || '';
+  document.querySelector('.sidebar-logo h1').textContent = nombre;
+  document.getElementById('auth-logo-nombre').textContent = nombre;
+  document.title = nombre;
+
+  const foto = document.getElementById('sidebar-foto');
+  if (edificio.foto_url) {
+    foto.style.backgroundImage = `url('${edificio.foto_url}?v=${Date.now()}')`;
+    foto.hidden = false;
+  } else {
+    foto.hidden = true;
+  }
+}
+
+function renderConfiguracion() {
+  if (!edificio) return;
+  const campos = {
+    'cfg-nombre': 'nombre', 'cfg-direccion': 'direccion', 'cfg-localidad': 'localidad',
+    'cfg-cuit': 'cuit', 'cfg-administrador': 'administrador',
+    'cfg-email': 'email_contacto', 'cfg-telefono': 'telefono',
+  };
+  for (const [id, campo] of Object.entries(campos)) {
+    document.getElementById(id).value = edificio[campo] || '';
+  }
+  pintarPreviewFoto();
+}
+
+function pintarPreviewFoto() {
+  const prev = document.getElementById('cfg-foto-preview');
+  const btn  = document.getElementById('cfg-foto-quitar');
+
+  if (edificio?.foto_url) {
+    // El parámetro evita que el navegador muestre la imagen anterior cacheada
+    prev.style.backgroundImage = `url('${edificio.foto_url}?v=${Date.now()}')`;
+    prev.classList.remove('foto-preview-vacia');
+    prev.textContent = '';
+    btn.hidden = false;
+  } else {
+    prev.style.backgroundImage = '';
+    prev.classList.add('foto-preview-vacia');
+    prev.textContent = 'Sin foto';
+    btn.hidden = true;
+  }
+}
+
+async function guardarConfiguracion() {
+  const cuerpo = {
+    nombre:         document.getElementById('cfg-nombre').value.trim(),
+    direccion:      document.getElementById('cfg-direccion').value.trim(),
+    localidad:      document.getElementById('cfg-localidad').value.trim(),
+    cuit:           document.getElementById('cfg-cuit').value.trim(),
+    administrador:  document.getElementById('cfg-administrador').value.trim(),
+    email_contacto: document.getElementById('cfg-email').value.trim(),
+    telefono:       document.getElementById('cfg-telefono').value.trim(),
+  };
+  if (!cuerpo.nombre) { toast('Falta el nombre del edificio', 'err'); return; }
+
+  try {
+    edificio = await api('edificio.php', 'PUT', cuerpo);
+    await cargarEdificio();
+    toast('Datos guardados');
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+}
+
+/** La foto va por multipart, no por JSON, así que no pasa por api(). */
+async function enviarFoto(formData) {
+  const r = await fetch('api/edificio.php', {
+    method: 'POST', body: formData, credentials: 'same-origin',
+  });
+  if (r.status === 401) { mostrarLogin('Tu sesión expiró'); throw new Error('Sesión expirada'); }
+  const d = await r.json();
+  if (!d.ok) throw new Error(d.error || 'Error al subir la imagen');
+  return d.data;
+}
+
+async function subirFotoEdificio(ev) {
+  const archivo = ev.target.files?.[0];
+  if (!archivo) return;
+
+  const estado = document.getElementById('cfg-foto-estado');
+  estado.textContent = 'Subiendo y procesando…';
+  estado.style.color = 'var(--text3)';
+
+  try {
+    const fd = new FormData();
+    fd.append('foto', archivo);
+    edificio = await enviarFoto(fd);
+
+    pintarPreviewFoto();
+    await cargarEdificio();
+    estado.textContent = 'Listo: imagen redimensionada y metadatos EXIF eliminados.';
+    estado.style.color = 'var(--success)';
+    toast('Foto actualizada');
+  } catch (e) {
+    estado.textContent = e.message;
+    estado.style.color = 'var(--danger)';
+  } finally {
+    ev.target.value = '';   // permite volver a elegir el mismo archivo
+  }
+}
+
+async function quitarFotoEdificio() {
+  if (!confirm('¿Quitar la foto del edificio?')) return;
+  try {
+    const fd = new FormData();
+    fd.append('accion', 'quitar');
+    edificio = await enviarFoto(fd);
+    pintarPreviewFoto();
+    await cargarEdificio();
+    document.getElementById('cfg-foto-estado').textContent = '';
+    toast('Foto eliminada');
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  Gestión de usuarios (solo administradores)
 // ═══════════════════════════════════════════════════════════════
 
@@ -1025,6 +1237,7 @@ const pageTitles = {
   caja:['Caja','Ingresos y egresos del edificio'],
   cuenta_corriente:['Cuenta Corriente','Estado de cuenta por unidad'],
   backup:['Backup','Exportar e importar la base de datos'],
+  configuracion:['Configuración','Datos del edificio administrado'],
   usuarios:['Usuarios','Quién puede entrar al sistema'],
   cuenta:['Mi Cuenta','Datos de acceso y contraseña'],
 };
@@ -1109,6 +1322,7 @@ async function navigate(page) {
   else if (page==='caja') initCaja();
   else if (page==='cuenta_corriente') { setupYearSelector('cc'); renderCuentaCorriente(); }
   else if (page==='backup') initBackup();
+  else if (page==='configuracion') renderConfiguracion();
   else if (page==='usuarios') renderUsuarios();
   else if (page==='cuenta') renderCuenta();
 }
@@ -2107,6 +2321,7 @@ function importBackup() {
 
 /** Carga los datos y deja la app lista. Se llama recién con sesión abierta. */
 async function iniciarApp() {
+  await cargarEdificio();
   unidades = await api('unidades.php');
 
   // Poblar selector de unidades en cuenta corriente

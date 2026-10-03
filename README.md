@@ -8,10 +8,10 @@
 > (las contraseñas viajan en texto plano sobre HTTP), y que el `.htaccess` esté
 > siendo respetado por el servidor.
 
-> **Nota sobre los iconos:** los favicons y los iconos de la PWA no están en el
-> repositorio porque son fotos del edificio real. Si clonás el proyecto vas a ver
-> errores 404 por esos archivos; no afectan el funcionamiento. Poné los tuyos con
-> los nombres que lista `.gitignore`.
+> **Nota sobre las imágenes:** ni los favicons, ni los iconos de la PWA, ni la
+> foto que se carga desde **Sistema → Configuración** están en el repositorio:
+> son fotos del edificio real e identifican la propiedad. Si clonás el proyecto
+> vas a ver errores 404 por los favicons; no afectan el funcionamiento.
 
 ## 1. Copiar el proyecto
 
@@ -47,7 +47,9 @@ edificio/
 │   ├── exportar_cuenta_corriente.php
 │   ├── backup.php
 │   ├── auth.php          ← login, logout y cambio de contraseña
-│   └── usuarios.php      ← alta y gestión de usuarios (solo admin)
+│   ├── usuarios.php      ← alta y gestión de usuarios (solo admin)
+│   └── edificio.php      ← datos y foto del edificio
+├── uploads/              ← imágenes subidas (no se publican)
 ├── includes/
 │   ├── config.php        ← lee el .env, no hay que editarlo
 │   ├── auth.php          ← sesión y protección de endpoints
@@ -109,6 +111,22 @@ contraseña (mínimo 8 caracteres) y entrás directo.
 Ese primer usuario queda como **administrador**, y la vía de alta se cierra apenas
 existe, así que nadie puede crearse una cuenta desde afuera. Después podés cambiar
 tu contraseña desde **Sistema → Mi Cuenta**.
+
+### Configuración del edificio
+
+En **Sistema → Configuración** (solo administradores) cargás el nombre, la
+dirección, el CUIT del consorcio, los datos del administrador y una foto. El
+nombre y la foto se muestran en la barra lateral y en el título de la pestaña.
+
+Estos datos viven en la base, no en los archivos: por eso el código del sistema
+sirve para cualquier edificio y no revela cuál administrás si compartís el
+repositorio.
+
+La foto se reduce a 1200 px y se vuelve a codificar a JPEG al subirla. Eso no es
+solo por peso: **descarta los metadatos EXIF**, que en una foto sacada con celular
+incluyen las coordenadas GPS del lugar donde se tomó. Solo se aceptan JPG, PNG y
+WEBP, validando el tipo real del archivo y no su extensión, y el directorio
+`uploads/` tiene el motor PHP apagado por `.htaccess`.
 
 ### Roles
 
