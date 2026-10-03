@@ -1,10 +1,9 @@
 <?php
 require_once __DIR__ . '/../includes/config.php';
 
-// Todos los endpoints exigen sesión iniciada. El SPA se sirve desde el mismo
-// origen, así que no hacen falta cabeceras CORS (y un Allow-Origin: * sería
-// contraproducente: impediría el envío de la cookie de sesión).
-requireLogin();
+// Exporta y restaura la base completa: ambas operaciones son de administrador,
+// así que se exige el rol en cualquier método, no solo en las escrituras.
+requireAdmin();
 
 $method = $_SERVER['REQUEST_METHOD'];
 

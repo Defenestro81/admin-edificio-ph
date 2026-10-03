@@ -78,7 +78,10 @@
   .stat-label{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.08em}
   .stat-value{font-family:'DM Serif Display',serif;font-size:28px;color:var(--text);margin:4px 0}
   .stat-sub{font-size:12px;color:var(--text2)}
-  .alert{padding:12px 16px;border-radius:var(--radius);font-size:13px;margin-bottom:16px;display:flex;align-items:flex-start;gap:10px}
+  /* display:block y no flex: el contenido de los avisos es texto corrido con
+     <strong> intercalados, y en un contenedor flex cada fragmento se convierte
+     en un ítem y el párrafo sale desarmado en columnas. */
+  .alert{padding:12px 16px;border-radius:var(--radius);font-size:13px;margin-bottom:16px;display:block;line-height:1.6}
   .alert-warning{background:#2a1f0a;border:1px solid #4a3510;color:#c8a050}
   .alert-success{background:#0f2a1a;border:1px solid #1f4a2a;color:var(--success)}
   .alert-info{background:#0f1e2a;border:1px solid #1f3a4a;color:var(--info)}
@@ -138,6 +141,30 @@
   .auth-form[hidden]{display:none}
   .auth-submit{width:100%;justify-content:center;margin-top:4px}
   .alert-danger{background:#2a0f0f;color:var(--danger);border:1px solid var(--danger)}
+
+  /* ─── Rol "consulta": solo lectura ───
+     El control real lo hace el backend (requireAdmin); esto es para que la
+     interfaz no ofrezca acciones que el servidor va a rechazar. Se filtra por
+     el atributo onclick en vez de por una clase para que alcance también a los
+     botones que el JS genera dentro de las tablas.
+     Ojo: no usar [onclick^="export"], que barrería exportarCaja y
+     exportarCuentaCorrienteUnidad, que son lecturas permitidas. */
+  body.rol-consulta .solo-admin,
+  body.rol-consulta [onclick^="guardar"],
+  body.rol-consulta [onclick^="delete"],
+  body.rol-consulta [onclick^="borrar"],
+  body.rol-consulta [onclick^="edit"],
+  body.rol-consulta [onclick^="openModal"],
+  body.rol-consulta [onclick^="calcular"],
+  body.rol-consulta [onclick^="anular"],
+  body.rol-consulta [onclick^="import"],
+  body.rol-consulta [onclick^="restaurar"],
+  body.rol-consulta [onclick^="abrirEnvio"],
+  body.rol-consulta [onclick^="previewMail"]{display:none!important}
+
+  .rol-chip{font-size:10px;padding:1px 6px;border-radius:10px;border:1px solid var(--border);color:var(--text3);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.06em}
+  .rol-chip.admin{color:var(--accent);border-color:var(--accent)}
+  .estado-baja{opacity:.5}
 
   /* ─── Pie de la barra lateral (usuario + salir) ─── */
   .sidebar-footer{margin-top:auto;padding:14px 20px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px}

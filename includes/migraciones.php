@@ -186,6 +186,30 @@ function migraciones(): array {
             ],
         ],
 
+        // ── 004 — Roles, baja lógica y trazabilidad ────────────────
+        [
+            'version' => '004',
+            'nombre'  => 'Roles de usuario y trazabilidad',
+            'sql'     => [
+                // 'admin' hace todo; 'consulta' solo lee.
+                "ALTER TABLE usuarios
+                    ADD COLUMN rol ENUM('admin','consulta') NOT NULL DEFAULT 'admin' AFTER nombre,
+                    ADD COLUMN activo TINYINT(1) NOT NULL DEFAULT 1 AFTER rol",
+
+                // Quién cargó cada movimiento de caja. ON DELETE SET NULL para que
+                // dar de baja un usuario nunca borre un asiento contable.
+                "ALTER TABLE caja
+                    ADD COLUMN usuario_id INT NULL DEFAULT NULL,
+                    ADD CONSTRAINT fk_caja_usuario
+                        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL",
+
+                "ALTER TABLE liquidaciones
+                    ADD COLUMN usuario_id INT NULL DEFAULT NULL,
+                    ADD CONSTRAINT fk_liquidaciones_usuario
+                        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL",
+            ],
+        ],
+
     ];
 }
 

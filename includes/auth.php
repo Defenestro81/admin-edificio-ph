@@ -45,7 +45,7 @@ function sesionIniciar(): void {
 function hayUsuarios(): bool {
     try {
         return (bool) db()->query('SELECT 1 FROM usuarios LIMIT 1')->fetchColumn();
-    } catch (PDOException $e) {
+    } catch (PDOException) {
         return false;   // la tabla todavía no existe
     }
 }
@@ -55,11 +55,14 @@ function usuarioActual(): ?array {
     sesionIniciar();
     if (empty($_SESSION['usuario_id'])) return null;
 
-    $st = db()->prepare('SELECT id, usuario, nombre, ultimo_acceso FROM usuarios WHERE id = ?');
+    $st = db()->prepare('SELECT id, usuario, nombre, rol, activo, ultimo_acceso FROM usuarios WHERE id = ?');
     $st->execute([$_SESSION['usuario_id']]);
     $u = $st->fetch();
 
-    if (!$u) {            // el usuario fue borrado con la sesión viva
+    // Si lo borraron o lo dieron de baja con la sesión abierta, se corta acá:
+    // el cambio de permisos tiene efecto en el próximo request, sin esperar a
+    // que venza la sesión.
+    if (!$u || !$u['activo']) {
         logout();
         return null;
     }
@@ -70,6 +73,32 @@ function usuarioActual(): ?array {
 function requireLogin(): void {
     if (usuarioActual() === null) {
         json_err('No autenticado', 401);
+    }
+}
+
+/** ¿El usuario logueado es administrador? */
+function esAdmin(): bool {
+    $u = usuarioActual();
+    return $u !== null && $u['rol'] === 'admin';
+}
+
+/** Corta con 403 si el usuario no es administrador. */
+function requireAdmin(): void {
+    requireLogin();
+    if (!esAdmin()) {
+        json_err('Esta acción requiere permisos de administrador', 403);
+    }
+}
+
+/**
+ * Exige sesión siempre, y rol admin solo si el request modifica algo.
+ * Es la que usan los endpoints que mezclan lectura y escritura: el rol
+ * 'consulta' puede hacer GET pero no POST/PUT/DELETE.
+ */
+function requireLoginAdminParaEscritura(): void {
+    requireLogin();
+    if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+        requireAdmin();
     }
 }
 
@@ -98,6 +127,10 @@ function login(string $usuario, string $password): array {
     if (!$u) {
         password_verify($password, '$2y$10$usuarioinexistenteusuarioinexistenteusuarioinexistentexxxx');
         return ['ok' => false, 'error' => 'Usuario o contraseña incorrectos'];
+    }
+
+    if (!$u['activo']) {
+        return ['ok' => false, 'error' => 'Esta cuenta está dada de baja'];
     }
 
     if ($u['esta_bloqueado']) {
@@ -148,7 +181,7 @@ function logout(): void {
  * Crea un usuario. Devuelve ['ok' => bool, 'error' => string|null].
  * Valida largo mínimo y unicidad del nombre de usuario.
  */
-function crearUsuario(string $usuario, string $password, string $nombre): array {
+function crearUsuario(string $usuario, string $password, string $nombre, string $rol = 'admin'): array {
     $usuario = trim($usuario);
     $nombre  = trim($nombre);
 
@@ -161,10 +194,13 @@ function crearUsuario(string $usuario, string $password, string $nombre): array 
     if (strlen($password) < AUTH_PASS_MIN) {
         return ['ok' => false, 'error' => 'La contraseña debe tener al menos ' . AUTH_PASS_MIN . ' caracteres'];
     }
+    if (!in_array($rol, ['admin', 'consulta'], true)) {
+        return ['ok' => false, 'error' => 'Rol inválido'];
+    }
 
     try {
-        db()->prepare('INSERT INTO usuarios (usuario, password_hash, nombre) VALUES (?, ?, ?)')
-            ->execute([$usuario, password_hash($password, PASSWORD_DEFAULT), $nombre]);
+        db()->prepare('INSERT INTO usuarios (usuario, password_hash, nombre, rol) VALUES (?, ?, ?, ?)')
+            ->execute([$usuario, password_hash($password, PASSWORD_DEFAULT), $nombre, $rol]);
     } catch (PDOException $e) {
         if ($e->errorInfo[1] == 1062) {
             return ['ok' => false, 'error' => 'Ese nombre de usuario ya existe'];
@@ -172,7 +208,16 @@ function crearUsuario(string $usuario, string $password, string $nombre): array 
         throw $e;
     }
 
-    return ['ok' => true, 'error' => null];
+    return ['ok' => true, 'error' => null, 'id' => (int) db()->lastInsertId()];
+}
+
+/**
+ * Cuántos administradores activos quedan. Sirve para no permitir que la
+ * instalación se quede sin ningún admin (nadie podría volver a entrar a
+ * gestionar usuarios).
+ */
+function cantidadAdmins(): int {
+    return (int) db()->query("SELECT COUNT(*) FROM usuarios WHERE rol = 'admin' AND activo = 1")->fetchColumn();
 }
 
 /** Cambia la contraseña del usuario logueado, validando la actual. */

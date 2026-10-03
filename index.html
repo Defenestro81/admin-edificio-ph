@@ -94,7 +94,8 @@
     </div>
     <div class="nav-section">
       <div class="nav-label">Sistema</div>
-      <div class="nav-item" onclick="navigate('backup')"><span class="nav-icon">◧</span> Backup</div>
+      <div class="nav-item solo-admin" onclick="navigate('usuarios')"><span class="nav-icon">◍</span> Usuarios</div>
+      <div class="nav-item solo-admin" onclick="navigate('backup')"><span class="nav-icon">◧</span> Backup</div>
       <div class="nav-item" onclick="navigate('cuenta')"><span class="nav-icon">◉</span> Mi Cuenta</div>
     </div>
 
@@ -381,6 +382,30 @@
         </div>
       </div>
 
+      <!-- USUARIOS -->
+      <div id="page-usuarios" class="page">
+        <div class="alert alert-info" style="margin-bottom:24px">
+          ℹ Los <strong>administradores</strong> pueden hacer todo. Los usuarios de
+          <strong>consulta</strong> ven la información pero no pueden cargar, modificar
+          ni borrar nada, ni exportar la base.
+        </div>
+
+        <div class="card">
+          <div class="card-title" style="justify-content:space-between">
+            <span>◍ Usuarios del sistema</span>
+            <button class="btn btn-primary btn-sm" onclick="openModalUsuario()">+ Nuevo usuario</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Usuario</th><th>Nombre</th><th>Rol</th><th>Estado</th><th>Último acceso</th><th></th>
+              </tr></thead>
+              <tbody id="usuarios-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- MI CUENTA -->
       <div id="page-cuenta" class="page">
         <div class="card" style="max-width:520px">
@@ -392,6 +417,10 @@
           <div class="form-group">
             <label class="form-label">Nombre</label>
             <input class="form-control" id="cuenta-nombre" disabled>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Rol</label>
+            <input class="form-control" id="cuenta-rol" disabled>
           </div>
         </div>
 
@@ -418,6 +447,56 @@
 
     </div>
   </main>
+</div>
+
+<!-- MODAL USUARIO -->
+<div class="modal-overlay" id="modal-usuario">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="usuario-modal-title">Nuevo usuario</div>
+      <button class="btn btn-ghost" onclick="closeModal('modal-usuario')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="usuario-id">
+      <div class="form-group">
+        <label class="form-label">Nombre *</label>
+        <input class="form-control" id="usuario-nombre" placeholder="Nombre y apellido">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Usuario *</label>
+        <input class="form-control" id="usuario-usuario" placeholder="letras, números, punto, guion" autocomplete="off">
+        <div id="usuario-usuario-fijo" style="font-size:11px;color:var(--text3);margin-top:4px" hidden>
+          El nombre de usuario no se puede cambiar.
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Rol *</label>
+        <div class="radio-group" id="usuario-rol-group">
+          <label class="radio-item selected" onclick="selectRadio('usuario-rol-group',this)"><input type="radio" value="consulta" checked> Consulta</label>
+          <label class="radio-item" onclick="selectRadio('usuario-rol-group',this)"><input type="radio" value="admin"> Administrador</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" id="usuario-pass-label">Contraseña *</label>
+        <input class="form-control" id="usuario-password" type="password" autocomplete="new-password"
+               placeholder="mínimo 8 caracteres">
+        <div id="usuario-pass-hint" style="font-size:11px;color:var(--text3);margin-top:4px" hidden>
+          Dejala vacía para no cambiarla.
+        </div>
+      </div>
+      <div class="form-group" id="usuario-activo-group" hidden>
+        <label class="form-label">Estado</label>
+        <div class="radio-group" id="usuario-estado-group">
+          <label class="radio-item selected" onclick="selectRadio('usuario-estado-group',this)"><input type="radio" value="1" checked> Activo</label>
+          <label class="radio-item" onclick="selectRadio('usuario-estado-group',this)"><input type="radio" value="0"> Dado de baja</label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-usuario')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarUsuario()">Guardar</button>
+    </div>
+  </div>
 </div>
 
 <!-- MODAL MOVIMIENTO -->
@@ -636,8 +715,16 @@ async function api(endpoint, method='GET', body=null) {
   // Sesión vencida o inexistente: volvemos a la pantalla de acceso en vez de
   // dejar que el error burbujee como un fallo cualquiera.
   if (r.status === 401) {
-    mostrarLogin();
+    mostrarLogin('Tu sesión expiró');
     throw new Error('Sesión expirada');
+  }
+
+  // 403: hay sesión, pero el rol no alcanza. Puede pasar si a alguien le
+  // cambian el rol con la pestaña abierta.
+  if (r.status === 403) {
+    const d = await r.json().catch(() => ({}));
+    toast(d.error || 'No tenés permisos para esta acción', 'err');
+    throw new Error(d.error || 'Sin permisos');
   }
 
   const data = await r.json();
@@ -688,7 +775,12 @@ function mostrarApp(usuario) {
   usuarioActual = usuario;
   document.getElementById('auth-overlay').hidden = true;
   document.getElementById('sidebar-usuario').textContent = usuario.nombre;
-  document.getElementById('sidebar-usuario').title = `Conectado como ${usuario.usuario}`;
+  document.getElementById('sidebar-usuario').title =
+    `${usuario.usuario} — ${usuario.rol === 'admin' ? 'administrador' : 'consulta'}`;
+
+  // El CSS cuelga de esta clase para ocultarle al rol 'consulta' las acciones
+  // de escritura. Es cosmético: quien decide es el backend.
+  document.body.classList.toggle('rol-consulta', usuario.rol !== 'admin');
 }
 
 function errorAuth(id, msg) {
@@ -783,6 +875,138 @@ function renderCuenta() {
   if (!usuarioActual) return;
   document.getElementById('cuenta-usuario').value = usuarioActual.usuario;
   document.getElementById('cuenta-nombre').value  = usuarioActual.nombre;
+  document.getElementById('cuenta-rol').value =
+    usuarioActual.rol === 'admin' ? 'Administrador (acceso total)' : 'Consulta (solo lectura)';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Gestión de usuarios (solo administradores)
+// ═══════════════════════════════════════════════════════════════
+
+function esAdmin() { return usuarioActual?.rol === 'admin'; }
+
+async function renderUsuarios() {
+  const lista = await api('usuarios.php');
+  const tb = document.getElementById('usuarios-table');
+
+  tb.innerHTML = lista.map(u => {
+    const chip = u.rol === 'admin'
+      ? '<span class="rol-chip admin">Administrador</span>'
+      : '<span class="rol-chip">Consulta</span>';
+    const estado = u.activo
+      ? '<span style="color:var(--success)">Activo</span>'
+      : '<span style="color:var(--text3)">Dado de baja</span>';
+    const acceso = u.ultimo_acceso
+      ? new Date(u.ultimo_acceso.replace(' ', 'T')).toLocaleString('es-AR')
+      : '<span style="color:var(--text3)">nunca</span>';
+
+    // El propio usuario no puede darse de baja: el backend lo rechaza, así que
+    // tampoco se ofrece el botón.
+    const btnBaja = (u.es_propio || !u.activo) ? '' :
+      `<button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="darDeBajaUsuario(${u.id},'${u.usuario}')">Dar de baja</button>`;
+
+    return `<tr class="${u.activo ? '' : 'estado-baja'}">
+      <td><strong>${u.usuario}</strong>${u.es_propio ? ' <span style="color:var(--text3);font-size:11px">(vos)</span>' : ''}</td>
+      <td>${u.nombre}</td>
+      <td>${chip}</td>
+      <td>${estado}</td>
+      <td style="font-size:12px">${acceso}</td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="btn btn-ghost btn-sm" onclick="editarUsuario(${u.id})">Editar</button>
+        ${btnBaja}
+      </td>
+    </tr>`;
+  }).join('');
+
+  usuariosCache = lista;
+}
+
+let usuariosCache = [];
+
+function openModalUsuario() {
+  document.getElementById('usuario-modal-title').textContent = 'Nuevo usuario';
+  document.getElementById('usuario-id').value = '';
+  document.getElementById('usuario-nombre').value = '';
+  document.getElementById('usuario-usuario').value = '';
+  document.getElementById('usuario-usuario').disabled = false;
+  document.getElementById('usuario-usuario-fijo').hidden = true;
+  document.getElementById('usuario-password').value = '';
+  document.getElementById('usuario-pass-label').textContent = 'Contraseña *';
+  document.getElementById('usuario-pass-hint').hidden = true;
+  document.getElementById('usuario-activo-group').hidden = true;
+  selectRadioPorValor('usuario-rol-group', 'consulta');
+  openModal('modal-usuario');
+}
+
+function editarUsuario(id) {
+  const u = usuariosCache.find(x => x.id === id);
+  if (!u) return;
+
+  document.getElementById('usuario-modal-title').textContent = 'Editar usuario';
+  document.getElementById('usuario-id').value = u.id;
+  document.getElementById('usuario-nombre').value = u.nombre;
+  document.getElementById('usuario-usuario').value = u.usuario;
+  document.getElementById('usuario-usuario').disabled = true;
+  document.getElementById('usuario-usuario-fijo').hidden = false;
+  document.getElementById('usuario-password').value = '';
+  document.getElementById('usuario-pass-label').textContent = 'Contraseña nueva';
+  document.getElementById('usuario-pass-hint').hidden = false;
+  document.getElementById('usuario-activo-group').hidden = u.es_propio;
+  selectRadioPorValor('usuario-rol-group', u.rol);
+  selectRadioPorValor('usuario-estado-group', u.activo ? '1' : '0');
+  openModal('modal-usuario');
+}
+
+/** Marca por valor el radio de un grupo, como lo hace selectRadio() al clickear. */
+function selectRadioPorValor(gid, valor) {
+  const grupo = document.getElementById(gid);
+  grupo.querySelectorAll('.radio-item').forEach(item => {
+    const marcado = item.querySelector('input').value === String(valor);
+    item.classList.toggle('selected', marcado);
+    item.querySelector('input').checked = marcado;
+  });
+}
+
+async function guardarUsuario() {
+  const id       = document.getElementById('usuario-id').value;
+  const nombre   = document.getElementById('usuario-nombre').value.trim();
+  const usuario  = document.getElementById('usuario-usuario').value.trim();
+  const password = document.getElementById('usuario-password').value;
+  const rol      = getRadioValue('usuario-rol-group');
+
+  if (!nombre)  { toast('Falta el nombre', 'err'); return; }
+  if (!id && !usuario) { toast('Falta el nombre de usuario', 'err'); return; }
+  if (!id && !password) { toast('Falta la contraseña', 'err'); return; }
+
+  try {
+    if (id) {
+      const cuerpo = { id: Number(id), nombre, rol };
+      if (password) cuerpo.password = password;
+      if (!document.getElementById('usuario-activo-group').hidden) {
+        cuerpo.activo = getRadioValue('usuario-estado-group') === '1';
+      }
+      await api('usuarios.php', 'PUT', cuerpo);
+      toast('Usuario actualizado');
+    } else {
+      await api('usuarios.php', 'POST', { nombre, usuario, password, rol });
+      toast('Usuario creado');
+    }
+    closeModal('modal-usuario');
+    renderUsuarios();
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+}
+
+async function darDeBajaUsuario(id, usuario) {
+  if (!confirm(`¿Dar de baja a "${usuario}"?\n\nNo va a poder volver a entrar, pero los movimientos de caja y liquidaciones que haya cargado se conservan con su nombre.`)) return;
+  try {
+    await api(`usuarios.php?id=${id}`, 'DELETE');
+    toast('Usuario dado de baja');
+    renderUsuarios();
+  } catch (e) {
+    toast(e.message, 'err');
+  }
 }
 
 let unidades = [];
@@ -801,6 +1025,7 @@ const pageTitles = {
   caja:['Caja','Ingresos y egresos del edificio'],
   cuenta_corriente:['Cuenta Corriente','Estado de cuenta por unidad'],
   backup:['Backup','Exportar e importar la base de datos'],
+  usuarios:['Usuarios','Quién puede entrar al sistema'],
   cuenta:['Mi Cuenta','Datos de acceso y contraseña'],
 };
 
@@ -884,6 +1109,7 @@ async function navigate(page) {
   else if (page==='caja') initCaja();
   else if (page==='cuenta_corriente') { setupYearSelector('cc'); renderCuentaCorriente(); }
   else if (page==='backup') initBackup();
+  else if (page==='usuarios') renderUsuarios();
   else if (page==='cuenta') renderCuenta();
 }
 
@@ -1032,7 +1258,7 @@ async function loadPeriod(){
   document.getElementById('period-label').textContent=periodLabel(currentPeriodo);
   document.getElementById('periodo-content').style.display='block';
   const liq=await api(`liquidacion.php?periodo=${currentPeriodo}`);
-  document.getElementById('liq-warning').style.display=liq?'flex':'none';
+  document.getElementById('liq-warning').style.display=liq?'block':'none';
   await renderGastosEsporadicos();
 }
 

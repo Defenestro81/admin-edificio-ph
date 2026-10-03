@@ -1,9 +1,10 @@
 <?php
 require_once __DIR__ . '/../includes/config.php';
-// Todos los endpoints exigen sesión iniciada. El SPA se sirve desde el mismo
-// origen, así que no hacen falta cabeceras CORS (y un Allow-Origin: * sería
-// contraproducente: impediría el envío de la cookie de sesión).
-requireLogin();
+// Todos los endpoints exigen sesión iniciada. El rol 'consulta' puede leer
+// (GET) pero no modificar: las escrituras piden rol 'admin'. El SPA se sirve
+// desde el mismo origen, así que no hacen falta cabeceras CORS (y un
+// Allow-Origin: * sería contraproducente: impediría el envío de la cookie).
+requireLoginAdminParaEscritura();
 
 $method = $_SERVER['REQUEST_METHOD'];
 $id     = isset($_GET['id']) ? (int)$_GET['id'] : null;
@@ -112,7 +113,7 @@ if ($method === 'POST') {
     try {
         $db->beginTransaction();
 
-        $st = $db->prepare('INSERT INTO caja (fecha, tipo, concepto, unidad_id, importe, periodo, notas) VALUES (?,?,?,?,?,?,?)');
+        $st = $db->prepare('INSERT INTO caja (fecha, tipo, concepto, unidad_id, importe, periodo, notas, usuario_id) VALUES (?,?,?,?,?,?,?,?)');
         $st->execute([
             $b['fecha'],
             $b['tipo'],
@@ -121,6 +122,7 @@ if ($method === 'POST') {
             (float)$b['importe'],
             $periodo,
             $b['notas'] ?? null,
+            usuarioActual()['id'],
         ]);
         $newId = (int)$db->lastInsertId();
 

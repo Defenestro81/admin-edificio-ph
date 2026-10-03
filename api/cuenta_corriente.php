@@ -1,9 +1,10 @@
 <?php
 require_once __DIR__ . '/../includes/config.php';
-// Todos los endpoints exigen sesión iniciada. El SPA se sirve desde el mismo
-// origen, así que no hacen falta cabeceras CORS (y un Allow-Origin: * sería
-// contraproducente: impediría el envío de la cookie de sesión).
-requireLogin();
+// Todos los endpoints exigen sesión iniciada. El rol 'consulta' puede leer
+// (GET) pero no modificar: las escrituras piden rol 'admin'. El SPA se sirve
+// desde el mismo origen, así que no hacen falta cabeceras CORS (y un
+// Allow-Origin: * sería contraproducente: impediría el envío de la cookie).
+requireLoginAdminParaEscritura();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') json_err('Método no permitido', 405);
 

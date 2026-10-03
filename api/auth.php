@@ -5,6 +5,17 @@ require_once __DIR__ . '/../includes/config.php';
 // la API. Un Access-Control-Allow-Origin: * acá sería además inútil, porque
 // los navegadores no mandan cookies de sesión a un origen comodín.
 
+/** Forma en que el front recibe al usuario. El rol lo usa para ocultar
+ *  las acciones de escritura cuando es de solo lectura. */
+function usuarioParaFront(array $u): array {
+    return [
+        'id'      => (int) $u['id'],
+        'usuario' => $u['usuario'],
+        'nombre'  => $u['nombre'],
+        'rol'     => $u['rol'],
+    ];
+}
+
 $method = $_SERVER['REQUEST_METHOD'];
 
 // ── GET — estado de la sesión ───────────────────────────────────────────────
@@ -14,7 +25,7 @@ if ($method === 'GET') {
     $u = usuarioActual();
     json_ok([
         'autenticado'  => $u !== null,
-        'usuario'      => $u ? ['id' => $u['id'], 'usuario' => $u['usuario'], 'nombre' => $u['nombre']] : null,
+        'usuario'      => $u ? usuarioParaFront($u) : null,
         'hay_usuarios' => hayUsuarios(),
     ]);
 }
@@ -39,7 +50,7 @@ if ($method === 'POST') {
         if (!$login['ok']) json_err($login['error']);
 
         $u = usuarioActual();
-        json_ok(['usuario' => ['id' => $u['id'], 'usuario' => $u['usuario'], 'nombre' => $u['nombre']]]);
+        json_ok(['usuario' => usuarioParaFront($u)]);
     }
 
     if ($accion === 'login') {
@@ -54,7 +65,7 @@ if ($method === 'POST') {
         if (!$r['ok']) json_err($r['error'], 401);
 
         $u = usuarioActual();
-        json_ok(['usuario' => ['id' => $u['id'], 'usuario' => $u['usuario'], 'nombre' => $u['nombre']]]);
+        json_ok(['usuario' => usuarioParaFront($u)]);
     }
 
     json_err('Acción desconocida');

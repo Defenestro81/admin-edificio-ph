@@ -46,7 +46,8 @@ edificio/
 │   ├── exportar_caja.php
 │   ├── exportar_cuenta_corriente.php
 │   ├── backup.php
-│   └── auth.php          ← login, logout y cambio de contraseña
+│   ├── auth.php          ← login, logout y cambio de contraseña
+│   └── usuarios.php      ← alta y gestión de usuarios (solo admin)
 ├── includes/
 │   ├── config.php        ← lee el .env, no hay que editarlo
 │   ├── auth.php          ← sesión y protección de endpoints
@@ -105,9 +106,31 @@ Abrí `http://localhost/edificio/`. Como todavía no hay ningún usuario, la app
 muestra la pantalla de **alta inicial**: cargás tu nombre, un usuario y una
 contraseña (mínimo 8 caracteres) y entrás directo.
 
-Esa vía de alta queda cerrada apenas existe el primer usuario, así que nadie más
-puede crearse una cuenta desde afuera. Después podés cambiar tu contraseña desde
-**Sistema → Mi Cuenta**.
+Ese primer usuario queda como **administrador**, y la vía de alta se cierra apenas
+existe, así que nadie puede crearse una cuenta desde afuera. Después podés cambiar
+tu contraseña desde **Sistema → Mi Cuenta**.
+
+### Roles
+
+Desde **Sistema → Usuarios** (visible solo para administradores) podés dar de alta
+a más gente. Hay dos roles:
+
+| | Administrador | Consulta |
+|---|---|---|
+| Ver unidades, caja, liquidaciones, cuenta corriente | Sí | Sí |
+| Exportar los CSV de caja y cuenta corriente | Sí | Sí |
+| Cargar, modificar y borrar cualquier cosa | Sí | **No** |
+| Emitir liquidaciones y enviar mails | Sí | **No** |
+| Exportar o restaurar la base completa | Sí | **No** |
+| Gestionar usuarios | Sí | **No** |
+
+El control lo hace el servidor, no la pantalla: un usuario de consulta recibe un
+error 403 aunque llame a la API por fuera de la interfaz.
+
+Los usuarios no se borran, se **dan de baja**: los movimientos de caja y las
+liquidaciones guardan quién los cargó, y borrar la fila dejaría esos registros
+sin autor. Tampoco podés quitarte el rol de administrador ni darte de baja a vos
+mismo, para que la instalación no quede sin nadie que pueda entrar a gestionarla.
 
 Si te olvidás la contraseña, no hay recuperación por mail: se resetea borrando la
 fila de la tabla `usuarios` desde phpMyAdmin, lo que vuelve a habilitar la
