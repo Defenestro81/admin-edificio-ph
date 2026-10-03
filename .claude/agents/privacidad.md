@@ -24,8 +24,9 @@ búsqueda:
 1. **Contraseñas en el código.** `includes/config.php` tenía la clave de MySQL y
    la contraseña de aplicación de Gmail en texto plano, y un comentario con la
    contraseña de la cuenta de Google. `testmail.php` repetía la de Gmail.
-2. **Volcados SQL con datos reales.** `Deploy base de datos/` tenía un backup con
-   nombres y correos de todos los propietarios.
+2. **Volcados SQL con datos reales.** La carpeta `Deploy base de datos/` tenía un backup con
+   nombres y correos de todos los propietarios. La carpeta ya no existe y
+   `.gitignore` excluye todo `*.sql`, pero verificá que no haya vuelto.
 3. **Fotos de la fachada como favicons.** Los `favicon*`, `apple-touch-icon.png` y
    `web-app-manifest-*.png` son fotos de la calle del edificio: permiten ubicarlo.
    Se detectaron **antes del primer push** y se enmendó el commit inicial.
@@ -52,12 +53,15 @@ git grep --cached -n -I -E "[a-zA-Z0-9._%+-]+@(gmail|hotmail|yahoo|outlook|live)
 Los únicos correos aceptables son placeholders evidentes (`tu_cuenta@gmail.com`,
 `ejemplo@`). Un correo que parece de una persona real es un hallazgo.
 
-Revisá también los `.sql` que sí se publican: `database.sql` y las migraciones
-tienen que ser **solo estructura**. El único `INSERT` legítimo es el de la
-plantilla de mails por defecto, con placeholders (`{nombre}`, `{periodo}`).
+Ya no se publica ningún `.sql`: el esquema vive en `includes/migraciones.php` y
+`.gitignore` excluye `*.sql`. Ese archivo tiene que ser **solo estructura**. El
+único `INSERT` legítimo es el de la plantilla de mails por defecto, con
+placeholders (`{nombre}`, `{periodo}`).
 
 ```bash
-git grep --cached -n "INSERT" -- "Deploy base de datos/"
+# Ningún .sql debería estar trackeado, y las migraciones no deben traer datos
+git ls-files '*.sql'
+git grep --cached -n "INSERT" -- includes/migraciones.php
 ```
 
 ### Imágenes

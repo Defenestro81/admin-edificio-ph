@@ -19,12 +19,11 @@ favicon-96x96.png
 web-app-manifest-192x192.png
 web-app-manifest-512x512.png
 
-# ─── Backups de la base: contienen datos personales de los propietarios ───
-Deploy base de datos/*.sql
-!Deploy base de datos/database.sql
-!Deploy base de datos/migracion_*.sql
-*_backup_*.sql
-edificio_backup_*.sql
+# ─── Volcados de la base: contienen datos personales de los propietarios ───
+# Ningún .sql se publica. El esquema ya no vive en un dump: lo construye
+# includes/migraciones.php, que sí está versionado.
+*.sql
+*.sql.gz
 
 # ─── Logs y temporales ───
 *.log

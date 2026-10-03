@@ -28,7 +28,7 @@
 | Componente | Versión mínima |
 |---|---|
 | XAMPP (Windows) | 8.x recomendado |
-| PHP | 7.4 o superior |
+| PHP | 8.0 o superior (usa `match` y `str_contains`) |
 | MySQL | 5.7 o superior |
 | Navegador | Chrome, Firefox, Edge (versión actual) |
 
@@ -46,32 +46,16 @@ C:\xampp\htdocs\
 ```
 Resultado esperado: `C:\xampp\htdocs\edificio\`
 
-### 2.2 Instalar PHPMailer
+> PHPMailer ya viene incluido en `vendor/`: no hay que descargar ni instalar
+> nada. El proyecto no usa Composer.
 
-1. Descargá PHPMailer desde: https://github.com/PHPMailer/PHPMailer/releases/latest
-2. Abrí el ZIP descargado
-3. Copiá estos 3 archivos a la carpeta `edificio/vendor/phpmailer/`:
-   - `src/PHPMailer.php`
-   - `src/SMTP.php`
-   - `src/Exception.php`
-
-### 2.3 Crear la base de datos
-
-1. Abrí el Panel de Control de XAMPP
-2. Iniciá los módulos **Apache** y **MySQL**
-3. Abrí el navegador y entrá a: `http://localhost/phpmyadmin`
-4. En la barra superior, hacé clic en **SQL**
-5. Abrí el archivo `Deploy base de datos/database.sql` con el Bloc de notas
-6. Copiá todo el contenido y pegalo en phpMyAdmin
-7. Hacé clic en **Ejecutar**
-
-Deberías ver que se creó la base de datos `edificio` con 10 tablas vacías.
-
-### 2.4 Crear el usuario de MySQL
+### 2.2 Crear el usuario de MySQL
 
 Por seguridad, el sistema usa un usuario propio en lugar de `root`.
 
-En phpMyAdmin → **SQL**, ejecutá (reemplazando la contraseña):
+1. Abrí el Panel de Control de XAMPP e iniciá **Apache** y **MySQL**
+2. Entrá a `http://localhost/phpmyadmin`
+3. En la barra superior hacé clic en **SQL** y ejecutá, cambiando la contraseña:
 
 ```sql
 CREATE USER 'edificio'@'localhost' IDENTIFIED BY 'tu_contraseña_aqui';
@@ -79,29 +63,71 @@ GRANT ALL PRIVILEGES ON edificio.* TO 'edificio'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
-### 2.5 Configurar el sistema
+> El `GRANT` nombra la base `edificio` antes de que exista, y está bien así:
+> MySQL acepta dar permisos sobre una base que todavía no se creó. Si vas a usar
+> otro nombre de base, cambialo también acá.
 
-Las credenciales van en un archivo llamado `.env` en la raíz de `edificio/`.
-Hacé una copia de `.env.example` con el nombre `.env`, abrila con cualquier
-editor de texto y completá:
+### 2.3 Ejecutar el instalador
+
+1. Abrí `http://localhost/edificio/instalar.php`
+2. Completá los datos de MySQL: host, nombre de la base, y el usuario y la
+   contraseña del paso anterior
+3. Si ya tenés la cuenta de Gmail con su contraseña de aplicación (sección 2.6),
+   completá también esos campos; si no, dejalos vacíos y cargalos después
+4. Apretá **Instalar**
+
+El instalador crea la base si no existe, arma todas las tablas y escribe el
+`.env` con las credenciales. Si la base ya existe la reutiliza y aplica solo lo
+que falte: **no borra datos**.
+
+> **Cuando termina, borrá `instalar.php`.** Mientras exista un `.env` el
+> instalador se niega a correr, pero un script que crea bases y escribe
+> credenciales no debería quedar accesible.
+
+No hay instalación manual. El esquema no existe como archivo `.sql`: lo
+construye `includes/migraciones.php` aplicando versiones en orden, y es lo único
+que sabe cómo tiene que quedar la base. Un volcado suelto se desactualiza y deja
+la base a medias, que es justamente lo que el motor de migraciones evita.
+
+### 2.4 Crear el primer usuario
+
+Entrá a `http://localhost/edificio`. La primera vez el sistema no tiene usuarios
+y muestra una pantalla para crear el primero, que queda como **administrador**.
+
+Esa pantalla se cierra sola en cuanto existe un usuario, así que no se puede
+usar dos veces para entrar sin permiso.
+
+Después, desde **Sistema → Usuarios**, un administrador puede dar de alta más
+gente con dos roles:
+
+- **admin** — hace todo, incluidas la configuración, los usuarios y el backup
+- **consulta** — solo mira; no puede modificar nada ni entrar a configuración
+
+### 2.5 Revisar el `.env`
+
+El instalador ya lo escribió. Vive en la raíz de `edificio/` y se ve así:
 
 ```ini
 # Base de datos
 DB_HOST=localhost
-DB_USER=edificio                      # usuario que creaste en el paso anterior
-DB_PASS="tu_contraseña_aqui"          # contraseña del usuario MySQL
+DB_USER=edificio                      # usuario que creaste en 2.2
+DB_PASS="tu_contraseña_aqui"          # contraseña de ese usuario
 DB_NAME=edificio
 
 # Cuenta de Gmail para envío de mails
 MAIL_USER=tu_cuenta@gmail.com
-MAIL_PASS="xxxx xxxx xxxx xxxx"       # contraseña de aplicación (ver sección 2.6)
+MAIL_PASS="xxxx xxxx xxxx xxxx"       # contraseña de aplicación (ver 2.6)
 MAIL_FROM=tu_cuenta@gmail.com
 MAIL_FROM_NAME="Administración Edificio"
 ```
 
-> **Importante:** el `.env` guarda contraseñas, por eso queda fuera del
-> repositorio (está listado en `.gitignore`). Si reinstalás el sistema en otra
-> máquina, hay que crearlo de nuevo a mano.
+Si una contraseña tiene espacios, comillas o barras invertidas, dejala entre
+comillas dobles como en el ejemplo.
+
+> **Importante:** el `.env` guarda contraseñas. Por eso queda fuera del
+> repositorio (está en `.gitignore`) y el `.htaccess` bloquea su lectura por web.
+> Si reinstalás en otra máquina hay que volver a correr el instalador, o copiar
+> el `.env` a mano.
 
 ### 2.6 Configurar contraseña de aplicación de Gmail
 
@@ -123,7 +149,14 @@ Abrí el navegador y entrá a:
 http://localhost/edificio
 ```
 
-Si todo está bien, vas a ver el Dashboard con las estadísticas en cero.
+Si todo está bien vas a ver la pantalla de ingreso, o la de crear el primer
+usuario si todavía no lo hiciste. Una vez adentro, el Dashboard muestra las
+estadísticas en cero hasta que cargues unidades y gastos.
+
+Para probar el correo, con sesión de administrador abrí
+`http://localhost/edificio/testmail.php`: manda un mail de prueba a la misma
+cuenta configurada e informa qué falló si no sale. A quien no sea administrador
+le responde 401.
 
 ---
 
@@ -412,7 +445,7 @@ Exportación e importación completa de la base de datos.
 2. Clic en **⬇ Descargar backup (.sql)**
 3. Se descarga un archivo con nombre `edificio_backup_YYYYMMDD_HHMMSS.sql`
 
-El archivo incluye la estructura y todos los datos de las 10 tablas. Se puede abrir con cualquier editor de texto para verificar su contenido.
+El archivo incluye la estructura y todos los datos de las tablas. Se puede abrir con cualquier editor de texto para verificar su contenido.
 
 **Recomendación:** hacer un backup antes de cada liquidación mensual y guardar los archivos en una carpeta fuera del servidor (ej: Google Drive, pendrive).
 
@@ -469,4 +502,4 @@ Sí, para todo excepto el envío de mails (que requiere conexión a Gmail SMTP) 
 
 ---
 
-*Última actualización: junio 2026*
+*Última actualización: octubre 2026*

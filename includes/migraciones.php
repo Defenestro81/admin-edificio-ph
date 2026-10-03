@@ -147,12 +147,13 @@ function migraciones(): array {
         //
         // Cada paso comprueba el esquema antes de tocarlo. No es prolijidad:
         // esta migración puede encontrarse con una base que ya tiene parte del
-        // cambio aplicado a mano —el script
-        // "Deploy base de datos/migracion_liquidacion_extraordinaria.sql" que
-        // circuló antes de que existiera este motor— y MySQL no admite
-        // "IF NOT EXISTS" en ADD COLUMN. Sin estas guardas, la migración
-        // aborta a mitad de camino, no queda registrada, y al reintentar falla
-        // en la primera sentencia: la instalación se traba sin salida.
+        // cambio aplicado a mano, porque antes de que existiera este motor el
+        // cambio se aplicaba con un script SQL suelto (ya eliminado del repo,
+        // pero que pudo correrse en bases que todavía están en uso). MySQL no
+        // admite "IF NOT EXISTS" en ADD COLUMN, así que preguntar es la única
+        // forma. Sin estas guardas la migración aborta a mitad de camino, no
+        // queda registrada, y al reintentar falla en la primera sentencia: la
+        // instalación se traba sin salida.
         [
             'version' => '002',
             'nombre'  => 'Liquidaciones extraordinarias',

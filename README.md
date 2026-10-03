@@ -29,7 +29,7 @@ edificio/
 ├── index.html
 ├── .env                  ← credenciales (lo creás vos, no se sube)
 ├── .env.example          ← plantilla del .env
-├── .htaccess             ← bloquea el acceso web al .env y a los .sql
+├── .htaccess             ← bloquea el acceso web al .env, a .git y a los .sql
 ├── instalar.php          ← crea la base y escribe el .env (borralo al terminar)
 ├── testmail.php          ← prueba de configuración SMTP
 ├── css/
@@ -55,9 +55,6 @@ edificio/
 │   ├── config.php        ← lee el .env, no hay que editarlo
 │   ├── auth.php          ← sesión y protección de endpoints
 │   └── migraciones.php   ← esquema de la base, versionado
-├── Deploy base de datos/
-│   ├── database.sql
-│   └── migracion_liquidacion_extraordinaria.sql
 └── vendor/               ← PHPMailer 7.0.2 vendorizado (ver vendor/README.md)
     └── phpmailer/
         ├── PHPMailer.php
@@ -84,9 +81,9 @@ Cuando termina, borrá `instalar.php` del servidor. Mientras exista un `.env` el
 instalador se niega a correr, pero lo prolijo es que un script que crea bases y
 escribe credenciales no quede accesible.
 
-> Si preferís hacerlo a mano, podés ejecutar `Deploy base de datos/database.sql`
-> en phpMyAdmin y crear el `.env` copiando `.env.example`. El instalador hace
-> exactamente eso, pero sin pasos manuales.
+> No hay forma manual: el esquema ya no existe como volcado `.sql`. Lo construye
+> `includes/migraciones.php`, que lo aplica por versiones y es lo único que sabe
+> cómo tiene que quedar la base. El instalador es la única vía.
 
 La base queda vacía. Cargá las unidades y gastos fijos desde la app.
 
