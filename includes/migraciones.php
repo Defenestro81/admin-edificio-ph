@@ -235,6 +235,33 @@ function migraciones(): array {
             ],
         ],
 
+        // ── 006 — Límite de intentos de acceso por velocidad ───────
+        [
+            'version' => '006',
+            'nombre'  => 'Límite de intentos de acceso',
+            'sql'     => [
+                // Registro de intentos para detectar ráfagas. Se purga solo:
+                // no es una bitácora de auditoría, solo la ventana reciente.
+                "CREATE TABLE IF NOT EXISTS intentos_login (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    ip VARCHAR(45) NOT NULL,
+                    usuario VARCHAR(50) NULL,
+                    creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    KEY idx_ip_fecha (ip, creado_en)
+                )",
+
+                // El bloqueo se guarda por IP y no por usuario: si fuera por
+                // usuario, un script evitaría el límite cambiando el nombre en
+                // cada intento.
+                "CREATE TABLE IF NOT EXISTS bloqueos_acceso (
+                    ip VARCHAR(45) PRIMARY KEY,
+                    bloqueado_hasta DATETIME NOT NULL,
+                    motivo VARCHAR(100) NOT NULL,
+                    creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )",
+            ],
+        ],
+
     ];
 }
 

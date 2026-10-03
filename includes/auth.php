@@ -7,10 +7,70 @@
 //  necesita agregar requireLogin() arriba de todo.
 // ═══════════════════════════════════════════════════════════════
 
-const AUTH_MAX_INTENTOS   = 5;    // fallos seguidos antes de bloquear
-const AUTH_BLOQUEO_MIN    = 15;   // minutos de bloqueo
+const AUTH_MAX_INTENTOS   = 5;    // fallos seguidos antes de bloquear la cuenta
+const AUTH_BLOQUEO_MIN    = 15;   // minutos de bloqueo de la cuenta
 const AUTH_INACTIVIDAD_MIN = 480; // cierra sesión tras 8 h sin actividad
 const AUTH_PASS_MIN       = 8;    // largo mínimo de contraseña
+
+// Límite por velocidad, independiente del anterior. Aquel cuenta fallos de una
+// cuenta; este mide el ritmo de los intentos desde una IP y salta aunque sean
+// exitosos, porque esa cadencia es la firma de un script, no de una persona.
+const AUTH_RAFAGA_INTENTOS = 3;   // intentos...
+const AUTH_RAFAGA_SEGUNDOS = 5;   // ...dentro de esta ventana
+const AUTH_RAFAGA_BLOQUEO_MIN = 5; // minutos de bloqueo de la IP
+
+/** IP del cliente. No se mira X-Forwarded-For: lo pone el cliente y se falsea. */
+function ipCliente(): string {
+    return substr($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0', 0, 45);
+}
+
+/**
+ * Minutos que faltan para que se levante el bloqueo de esta IP, o 0 si no
+ * está bloqueada. La comparación va entera en SQL: mezclar NOW() de MySQL con
+ * time() de PHP falla si los relojes están en zonas distintas.
+ */
+function bloqueoRestanteMin(): int {
+    $st = db()->prepare(
+        'SELECT GREATEST(TIMESTAMPDIFF(MINUTE, NOW(), bloqueado_hasta), 1)
+           FROM bloqueos_acceso
+          WHERE ip = ? AND bloqueado_hasta > NOW()'
+    );
+    $st->execute([ipCliente()]);
+    return (int) ($st->fetchColumn() ?: 0);
+}
+
+/**
+ * Deja constancia del intento y, si la IP superó el ritmo permitido, la
+ * bloquea. Devuelve true si a partir de ahora está bloqueada.
+ */
+function registrarIntento(?string $usuario): bool {
+    $ip = ipCliente();
+    $db = db();
+
+    $db->prepare('INSERT INTO intentos_login (ip, usuario) VALUES (?, ?)')
+       ->execute([$ip, $usuario !== null ? substr($usuario, 0, 50) : null]);
+
+    // Se purga la cola vieja acá mismo para no necesitar una tarea programada.
+    $db->exec('DELETE FROM intentos_login WHERE creado_en < NOW() - INTERVAL 1 HOUR');
+
+    $st = $db->prepare(
+        'SELECT COUNT(*) FROM intentos_login
+          WHERE ip = ? AND creado_en > NOW() - INTERVAL ' . AUTH_RAFAGA_SEGUNDOS . ' SECOND'
+    );
+    $st->execute([$ip]);
+
+    if ((int) $st->fetchColumn() < AUTH_RAFAGA_INTENTOS) return false;
+
+    $db->prepare(
+        'INSERT INTO bloqueos_acceso (ip, bloqueado_hasta, motivo)
+         VALUES (?, NOW() + INTERVAL ' . AUTH_RAFAGA_BLOQUEO_MIN . ' MINUTE, ?)
+         ON DUPLICATE KEY UPDATE
+            bloqueado_hasta = NOW() + INTERVAL ' . AUTH_RAFAGA_BLOQUEO_MIN . ' MINUTE,
+            motivo = VALUES(motivo)'
+    )->execute([$ip, AUTH_RAFAGA_INTENTOS . ' intentos en ' . AUTH_RAFAGA_SEGUNDOS . ' segundos']);
+
+    return true;
+}
 
 /** Arranca la sesión con cookies endurecidas. Idempotente. */
 function sesionIniciar(): void {
@@ -108,6 +168,17 @@ function requireLoginAdminParaEscritura(): void {
  */
 function login(string $usuario, string $password): array {
     sesionIniciar();
+
+    // El límite por ráfaga se evalúa antes que nada: si la IP ya está
+    // bloqueada no se toca la base de usuarios ni se verifica ningún hash.
+    $restante = bloqueoRestanteMin();
+    if ($restante > 0) {
+        return ['ok' => false, 'error' => "Demasiados intentos seguidos. Esperá {$restante} min."];
+    }
+
+    if (registrarIntento($usuario)) {
+        return ['ok' => false, 'error' => 'Demasiados intentos seguidos. Esperá ' . AUTH_RAFAGA_BLOQUEO_MIN . ' min.'];
+    }
 
     // El estado del bloqueo se resuelve dentro de MySQL a propósito: comparar
     // una fecha de la base contra time() de PHP falla si los dos relojes están
