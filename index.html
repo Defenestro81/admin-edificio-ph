@@ -1273,6 +1273,17 @@ function periodLabel(p) {
   return m[parseInt(p.slice(4))-1]+' '+p.slice(0,4);
 }
 
+// Fecha de hoy en hora local, con formato YYYY-MM-DD para un <input type="date">.
+// No se puede usar toISOString(): eso convierte a UTC, y como Argentina está en
+// UTC-3, después de las 21:00 devolvía la fecha de mañana. getFullYear/getMonth/
+// getDate sí leen el reloj local.
+function fechaHoyLocal() {
+  const d = new Date();
+  return d.getFullYear() + '-' +
+         String(d.getMonth() + 1).padStart(2, '0') + '-' +
+         String(d.getDate()).padStart(2, '0');
+}
+
 function fmt(n){return '$ '+Number(n).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2})}
 function coefFmt(n){return Number(n).toFixed(4)}
 function coefSum(){return unidades.reduce((s,u)=>s+parseFloat(u.coeficiente||0),0)}
@@ -2064,7 +2075,7 @@ async function renderCaja() {
 
 function openModalMovimiento() {
   const now = new Date();
-  document.getElementById('mov-fecha').value = now.toISOString().split('T')[0];
+  document.getElementById('mov-fecha').value = fechaHoyLocal();
   document.getElementById('mov-concepto').value = '';
   document.getElementById('mov-importe').value = '';
   document.getElementById('mov-notas').value = '';
