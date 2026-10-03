@@ -30,6 +30,7 @@ edificio/
 ├── .env                  ← credenciales (lo creás vos, no se sube)
 ├── .env.example          ← plantilla del .env
 ├── .htaccess             ← bloquea el acceso web al .env y a los .sql
+├── instalar.php          ← crea la base y escribe el .env (borralo al terminar)
 ├── testmail.php          ← prueba de configuración SMTP
 ├── css/
 │   └── style.css
@@ -67,15 +68,27 @@ edificio/
 > El proyecto **no usa Composer**: `vendor/` viene incluido, así que no hay
 > ningún paso de instalación de dependencias.
 
-## 3. Crear la base de datos
+## 3. Instalar
 
 1. Abrí XAMPP y arrancá Apache y MySQL
-2. Entrá a http://localhost/phpmyadmin
-3. Hacé clic en "SQL" (barra superior)
-4. Copiá y pegá el contenido de `Deploy base de datos/database.sql`
-5. Ejecutá
+2. Entrá a **http://localhost/edificio/instalar.php**
+3. Completá los datos de MySQL (host, nombre de la base, usuario y contraseña) y,
+   si querés, los del correo
+4. Apretá *Instalar*
 
-La base se crea vacía. Cargá las unidades y gastos fijos desde la app.
+El instalador crea la base si no existe, aplica las migraciones y escribe el
+`.env` por vos. Si la base ya existe, la reutiliza y solo aplica lo que falte:
+**no borra datos**.
+
+Cuando termina, borrá `instalar.php` del servidor. Mientras exista un `.env` el
+instalador se niega a correr, pero lo prolijo es que un script que crea bases y
+escribe credenciales no quede accesible.
+
+> Si preferís hacerlo a mano, podés ejecutar `Deploy base de datos/database.sql`
+> en phpMyAdmin y crear el `.env` copiando `.env.example`. El instalador hace
+> exactamente eso, pero sin pasos manuales.
+
+La base queda vacía. Cargá las unidades y gastos fijos desde la app.
 
 ## 4. Configurar credenciales
 

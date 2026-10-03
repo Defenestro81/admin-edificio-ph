@@ -144,26 +144,66 @@ function migraciones(): array {
         ],
 
         // ── 002 — Liquidaciones extraordinarias ────────────────────
+        //
+        // Cada paso comprueba el esquema antes de tocarlo. No es prolijidad:
+        // esta migración puede encontrarse con una base que ya tiene parte del
+        // cambio aplicado a mano —el script
+        // "Deploy base de datos/migracion_liquidacion_extraordinaria.sql" que
+        // circuló antes de que existiera este motor— y MySQL no admite
+        // "IF NOT EXISTS" en ADD COLUMN. Sin estas guardas, la migración
+        // aborta a mitad de camino, no queda registrada, y al reintentar falla
+        // en la primera sentencia: la instalación se traba sin salida.
         [
             'version' => '002',
             'nombre'  => 'Liquidaciones extraordinarias',
             'sql'     => [
-                "ALTER TABLE liquidaciones
-                    ADD COLUMN tipo ENUM('ordinaria','extraordinaria') NOT NULL DEFAULT 'ordinaria' AFTER periodo,
-                    ADD COLUMN titulo VARCHAR(150) NULL AFTER tipo",
+                function (PDO $db): void {
+                    if (columnaExiste($db, 'liquidaciones', 'tipo')) return;
+                    $db->exec("ALTER TABLE liquidaciones
+                        ADD COLUMN tipo ENUM('ordinaria','extraordinaria') NOT NULL DEFAULT 'ordinaria' AFTER periodo,
+                        ADD COLUMN titulo VARCHAR(150) NULL AFTER tipo");
+                },
 
-                "ALTER TABLE liquidaciones DROP INDEX periodo",
-                "ALTER TABLE liquidaciones ADD INDEX idx_periodo_tipo (periodo, tipo)",
+                function (PDO $db): void {
+                    if (indiceExiste($db, 'liquidaciones', 'periodo')) {
+                        $db->exec("ALTER TABLE liquidaciones DROP INDEX periodo");
+                    }
+                    if (!indiceExiste($db, 'liquidaciones', 'idx_periodo_tipo')) {
+                        $db->exec("ALTER TABLE liquidaciones ADD INDEX idx_periodo_tipo (periodo, tipo)");
+                    }
+                },
 
+                // MODIFY es idempotente: repetirlo deja la columna igual.
                 "ALTER TABLE liquidacion_lineas
                     MODIFY COLUMN tipo ENUM('fijo','esporadico','extraordinario') DEFAULT 'fijo'",
 
-                "ALTER TABLE cuenta_corriente
-                    ADD COLUMN extraordinario DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER saldo_anterior",
+                function (PDO $db): void {
+                    if (columnaExiste($db, 'cuenta_corriente', 'extraordinario')) return;
+                    $db->exec("ALTER TABLE cuenta_corriente
+                        ADD COLUMN extraordinario DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER saldo_anterior");
+                },
 
-                "ALTER TABLE cuenta_corriente
-                    ADD COLUMN saldo_final DECIMAL(12,2)
-                    GENERATED ALWAYS AS (saldo_anterior + deuda + extraordinario - pagado) STORED",
+                // saldo_final es una columna generada. Si ya está, hay que
+                // REDEFINIRLA: una base anterior la tiene con la fórmula vieja,
+                // sin "+ extraordinario", y dejarla así calcularía mal los
+                // saldos en silencio, que es peor que fallar.
+                function (PDO $db): void {
+                    $formula = 'saldo_anterior + deuda + extraordinario - pagado';
+                    $actual  = expresionGenerada($db, 'cuenta_corriente', 'saldo_final');
+
+                    if ($actual === null && !columnaExiste($db, 'cuenta_corriente', 'saldo_final')) {
+                        $db->exec("ALTER TABLE cuenta_corriente
+                            ADD COLUMN saldo_final DECIMAL(12,2)
+                            GENERATED ALWAYS AS ($formula) STORED");
+                        return;
+                    }
+
+                    if ($actual === null || !str_contains($actual, 'extraordinario')) {
+                        $db->exec("ALTER TABLE cuenta_corriente
+                            MODIFY COLUMN saldo_final DECIMAL(12,2)
+                            GENERATED ALWAYS AS ($formula) STORED");
+                    }
+                },
             ],
         ],
 
@@ -266,6 +306,45 @@ function migraciones(): array {
 }
 
 // ───────────────────────────────────────────────────────────────
+//  Inspección del esquema
+//
+//  Sirve para escribir migraciones idempotentes. MySQL no admite
+//  "IF NOT EXISTS" en ADD COLUMN ni en ADD INDEX, así que la única
+//  forma de que una migración tolere aplicarse sobre una base que ya
+//  tiene parte del cambio es preguntar antes.
+// ───────────────────────────────────────────────────────────────
+
+function tablaExiste(PDO $db, string $tabla): bool {
+    $st = $db->prepare('SELECT 1 FROM INFORMATION_SCHEMA.TABLES
+                         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?');
+    $st->execute([$tabla]);
+    return (bool) $st->fetchColumn();
+}
+
+function columnaExiste(PDO $db, string $tabla, string $columna): bool {
+    $st = $db->prepare('SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?');
+    $st->execute([$tabla, $columna]);
+    return (bool) $st->fetchColumn();
+}
+
+function indiceExiste(PDO $db, string $tabla, string $indice): bool {
+    $st = $db->prepare('SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
+                         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?');
+    $st->execute([$tabla, $indice]);
+    return (bool) $st->fetchColumn();
+}
+
+/** Expresión de una columna generada, o null si no lo es o no existe. */
+function expresionGenerada(PDO $db, string $tabla, string $columna): ?string {
+    $st = $db->prepare('SELECT GENERATION_EXPRESSION FROM INFORMATION_SCHEMA.COLUMNS
+                         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?');
+    $st->execute([$tabla, $columna]);
+    $v = $st->fetchColumn();
+    return ($v === false || $v === '') ? null : (string) $v;
+}
+
+// ───────────────────────────────────────────────────────────────
 //  Motor
 // ───────────────────────────────────────────────────────────────
 
@@ -290,15 +369,35 @@ function migracionesInit(PDO $db): bool {
 function migracionesBaseline(PDO $db): array {
     $marcadas = [];
 
-    // ¿La base ya tenía el esquema inicial?
-    if (!$db->query("SHOW TABLES LIKE 'unidades'")->fetchColumn()) {
-        return $marcadas;   // base vacía: que corran todas desde cero
-    }
+    // Una migración solo se da por aplicada si están TODAS las piezas que crea.
+    // Alcanzaba con mirar una sola tabla, pero si la base venía incompleta —por
+    // ejemplo con "unidades" pero sin "plantilla_mail"— quedaba registrada igual
+    // y esa tabla no se creaba nunca: el motor ya no la vuelve a mirar.
+    $tablas001 = [
+        'unidades', 'gastos_fijos', 'gastos_fijos_unidades',
+        'gastos_esporadicos', 'gastos_esporadicos_unidades',
+        'liquidaciones', 'liquidacion_detalle', 'liquidacion_lineas',
+        'caja', 'cuenta_corriente', 'plantilla_mail',
+    ];
+
+    $faltantes001 = array_filter($tablas001, fn($t) => !tablaExiste($db, $t));
+
+    // Base vacía o a medias: que corran las migraciones desde cero. Los
+    // CREATE TABLE de 001 llevan IF NOT EXISTS, así que completar lo que falta
+    // es seguro aunque parte ya esté.
+    if ($faltantes001 !== []) return $marcadas;
+
     $marcadas[] = '001';
 
-    // ¿Ya tenía aplicada la migración de extraordinarias?
-    $tieneTipo = $db->query("SHOW COLUMNS FROM liquidaciones LIKE 'tipo'")->fetchColumn();
-    if ($tieneTipo) $marcadas[] = '002';
+    // 002 solo si está completa: la columna de tipo, la de cargos
+    // extraordinarios y la fórmula de saldo_final ya redefinida. Marcarla con
+    // una sola de las tres dejaba saldos mal calculados sin aviso.
+    $expr = expresionGenerada($db, 'cuenta_corriente', 'saldo_final');
+    $completa002 = columnaExiste($db, 'liquidaciones', 'tipo')
+                && columnaExiste($db, 'cuenta_corriente', 'extraordinario')
+                && $expr !== null && str_contains($expr, 'extraordinario');
+
+    if ($completa002) $marcadas[] = '002';
 
     $todas = array_column(migraciones(), null, 'version');
     foreach ($marcadas as $v) {
@@ -335,7 +434,14 @@ function migracionesAplicar(PDO $db): array {
     foreach (migracionesPendientes($db) as $m) {
         foreach ($m['sql'] as $i => $sentencia) {
             try {
-                $db->exec($sentencia);
+                // Una sentencia puede ser SQL plano o un closure que recibe la
+                // conexión, para los casos que necesitan mirar el esquema antes
+                // de decidir qué ejecutar.
+                if (is_callable($sentencia)) {
+                    $sentencia($db);
+                } else {
+                    $db->exec($sentencia);
+                }
             } catch (PDOException $e) {
                 throw new RuntimeException(
                     "Falló la migración {$m['version']} ({$m['nombre']}), sentencia #" . ($i + 1) .

@@ -358,7 +358,7 @@
                 <span class="tag">cuenta_corriente</span>
               </div>
             </div>
-            <button class="btn btn-primary btn-lg" style="width:100%;justify-content:center" onclick="exportBackup()">
+            <button class="btn btn-primary btn-lg solo-admin" style="width:100%;justify-content:center" onclick="exportBackup()">
               ⬇ Descargar backup (.sql)
             </button>
           </div>
@@ -369,7 +369,7 @@
             <div class="alert alert-danger" style="margin-bottom:20px">
               ⚠ <strong>Atención: Restaurar reemplaza toda la base de datos actual con el archivo seleccionado. Esta acción no se puede deshacer.</strong>
             </div>
-            <div class="backup-dropzone" id="backup-dropzone" onclick="document.getElementById('backup-file').click()">
+            <div class="backup-dropzone solo-admin" id="backup-dropzone" onclick="document.getElementById('backup-file').click()">
               <div style="font-size:36px;line-height:1;margin-bottom:10px">📂</div>
               <div style="font-size:14px;font-weight:500;color:var(--text);margin-bottom:4px">Seleccionar archivo .sql</div>
               <div style="font-size:12px;color:var(--text3)">o arrastrá y soltá aquí</div>
@@ -445,10 +445,10 @@
               <input type="file" id="cfg-foto-input" accept="image/jpeg,image/png,image/webp" hidden
                      onchange="subirFotoEdificio(event)">
               <div style="display:flex;gap:10px;flex-wrap:wrap">
-                <button class="btn btn-secondary" onclick="document.getElementById('cfg-foto-input').click()">
+                <button class="btn btn-secondary solo-admin" onclick="document.getElementById('cfg-foto-input').click()">
                   Elegir imagen…
                 </button>
-                <button class="btn btn-ghost" style="color:var(--danger)" id="cfg-foto-quitar"
+                <button class="btn btn-ghost solo-admin" style="color:var(--danger)" id="cfg-foto-quitar"
                         onclick="quitarFotoEdificio()" hidden>Quitar foto</button>
               </div>
               <div style="font-size:11px;color:var(--text3);margin-top:10px;font-family:'DM Mono',monospace">
@@ -713,7 +713,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-mail')">Cerrar</button>
-      <button class="btn btn-primary" id="btn-send-mail">📤 Enviar mail</button>
+      <button class="btn btn-primary solo-admin" id="btn-send-mail">📤 Enviar mail</button>
     </div>
   </div>
 </div>
@@ -741,7 +741,7 @@
 
       <div class="section-header" style="margin-top:8px;margin-bottom:12px">
         <div class="section-title" style="font-size:14px">Conceptos</div>
-        <button type="button" class="btn btn-secondary btn-sm" onclick="agregarConceptoExtra()">+ Agregar concepto</button>
+        <button type="button" class="btn btn-secondary btn-sm solo-admin" onclick="agregarConceptoExtra()">+ Agregar concepto</button>
       </div>
       <div id="ex-conceptos"></div>
 
@@ -1098,7 +1098,14 @@ async function quitarFotoEdificio() {
 function esAdmin() { return usuarioActual?.rol === 'admin'; }
 
 async function renderUsuarios() {
-  const lista = await api('usuarios.php');
+  let lista;
+  try {
+    lista = await api('usuarios.php');
+  } catch (e) {
+    // Si el rol no alcanza, api() ya avisó con un toast. Sin este catch el
+    // rechazo queda sin manejar y ensucia la consola con un error suelto.
+    return;
+  }
   const tb = document.getElementById('usuarios-table');
 
   tb.innerHTML = lista.map(u => {
@@ -1115,7 +1122,7 @@ async function renderUsuarios() {
     // El propio usuario no puede darse de baja: el backend lo rechaza, así que
     // tampoco se ofrece el botón.
     const btnBaja = (u.es_propio || !u.activo) ? '' :
-      `<button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="darDeBajaUsuario(${u.id},'${u.usuario}')">Dar de baja</button>`;
+      `<button class="btn btn-ghost btn-sm solo-admin" style="color:var(--danger)" onclick="darDeBajaUsuario(${u.id},'${u.usuario}')">Dar de baja</button>`;
 
     return `<tr class="${u.activo ? '' : 'estado-baja'}">
       <td><strong>${u.usuario}</strong>${u.es_propio ? ' <span style="color:var(--text3);font-size:11px">(vos)</span>' : ''}</td>

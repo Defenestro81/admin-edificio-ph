@@ -25,9 +25,15 @@ function env_cargar(string $archivo): void {
 
         // Quita las comillas envolventes si las hay
         $largo = strlen($valor);
-        if ($largo >= 2 &&
-            (($valor[0] === '"' && $valor[$largo - 1] === '"') ||
-             ($valor[0] === "'" && $valor[$largo - 1] === "'"))) {
+        if ($largo >= 2 && $valor[0] === '"' && $valor[$largo - 1] === '"') {
+            $valor = substr($valor, 1, -1);
+            // Las comillas dobles admiten escapes, y hay que deshacerlos: así
+            // los escribe instalar.php. Sin esto una contraseña con \ o " se
+            // lee mal y la conexión falla sin explicación. strtr hace una sola
+            // pasada, de modo que \\" no se procesa dos veces.
+            $valor = strtr($valor, ['\\\\' => '\\', '\\"' => '"']);
+        } elseif ($largo >= 2 && $valor[0] === "'" && $valor[$largo - 1] === "'") {
+            // Las comillas simples son literales: no se desescapa nada.
             $valor = substr($valor, 1, -1);
         }
 
@@ -73,12 +79,24 @@ define('MAIL_FROM_NAME', env('MAIL_FROM_NAME', 'Administración del Edificio'));
 function db(): PDO {
     static $pdo;
     if (!$pdo) {
-        $pdo = new PDO(
-            'mysql:host='.DB_HOST.';dbname='.DB_NAME.';charset=utf8mb4',
-            DB_USER, DB_PASS,
-            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]
-        );
+        try {
+            $pdo = new PDO(
+                'mysql:host='.DB_HOST.';dbname='.DB_NAME.';charset=utf8mb4',
+                DB_USER, DB_PASS,
+                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]
+            );
+        } catch (PDOException $e) {
+            // Si MySQL está caído o cambiaron las credenciales, la excepción sin
+            // capturar se renderiza en la respuesta con display_errors activado:
+            // la traza muestra host, base, usuario y rutas del servidor. Se
+            // responde algo genérico y el detalle va solo al log.
+            error_log('Fallo de conexión a la base: ' . $e->getMessage());
+            http_response_code(500);
+            header('Content-Type: application/json');
+            echo json_encode(['ok' => false, 'error' => 'No se pudo conectar a la base de datos']);
+            exit;
+        }
     }
     return $pdo;
 }

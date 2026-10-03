@@ -1,6 +1,25 @@
 # Impide que el navegador pueda leer archivos sensibles que están
 # dentro de la raíz web (Apache 2.4 / XAMPP).
 
+# Sin esto Apache lista el contenido de cada carpeta, lo que enumera todos los
+# endpoints e includes por nombre y revela las versiones de Apache y PHP.
+Options -Indexes
+
+# El repositorio de git. Es lo más importante de este archivo: con .git
+# accesible se reconstruye el código completo y todo el historial, lo que
+# saltea las reglas de abajo — un archivo commiteado se baja desde .git aunque
+# su extensión esté bloqueada acá.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule (^|/)\.git(/|$) - [F,L]
+</IfModule>
+
+# Respaldo por si mod_rewrite no estuviera disponible: cubre los archivos
+# sueltos de .git aunque no el directorio entero.
+<FilesMatch "^\.git">
+    Require all denied
+</FilesMatch>
+
 # Credenciales
 <FilesMatch "^\.env">
     Require all denied

@@ -13,10 +13,18 @@ use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
 use PHPMailer\PHPMailer\Exception;
 
-// Las credenciales salen del .env; sólo el destino del test se pone acá
+// Solo administradores. Sin esto cualquiera puede alcanzar la página: manda un
+// correo desde la cuenta del consorcio —un relay abierto— y además la traza SMTP
+// que se imprime abajo revela esa cuenta.
+requireAdmin();
+
+// Las credenciales salen del .env.
 $gmail_user = MAIL_USER;
 $gmail_pass = MAIL_PASS;
-$destino    = $_GET['to'] ?? MAIL_FROM;   // ?to=alguien@dominio.com para probar otro destinatario
+
+// El destino se fija al propio remitente. Antes se tomaba de ?to=, lo que
+// permitía usar la cuenta para mandar correo a cualquier dirección.
+$destino    = MAIL_FROM;
 
 
 
