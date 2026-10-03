@@ -42,7 +42,13 @@ if ($method === 'PUT' && $id) {
     $b = body();
     if (empty($b['nombre']) || !isset($b['coeficiente'])) json_err('Faltan campos');
 
-    $suma = (float) db()->query("SELECT COALESCE(SUM(coeficiente),0) FROM unidades WHERE id != $id")->fetchColumn();
+    // Se excluye la unidad que se está editando. El id va como parámetro y no
+    // interpolado: el cast a int de arriba ya lo vuelve inofensivo, pero
+    // mantener el patrón del resto del proyecto evita que un cambio futuro
+    // (por ejemplo aceptar el id desde el body, sin castear) lo reabra.
+    $st = db()->prepare('SELECT COALESCE(SUM(coeficiente),0) FROM unidades WHERE id != ?');
+    $st->execute([$id]);
+    $suma = (float) $st->fetchColumn();
     if (round($suma + (float)$b['coeficiente'], 6) > 1.000001) json_err('La suma de coeficientes superaría 1.0000');
 
     $st = db()->prepare('UPDATE unidades SET nombre=?, propietario=?, email=?, coeficiente=?, ascensor=?, orden=? WHERE id=?');
