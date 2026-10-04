@@ -79,7 +79,15 @@ function sesionIniciar(): void {
     $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
           || (($_SERVER['SERVER_PORT'] ?? null) == 443);
 
-    session_name('EDIFICIOSESS');
+    // El nombre de la cookie incluye un sufijo derivado de la ruta de
+    // instalación. Sin esto, dos instancias en el mismo host (por ejemplo
+    // localhost/edificio y localhost/otro) comparten una sola cookie llamada
+    // EDIFICIOSESS en ruta "/", y como la sesión guarda únicamente el
+    // usuario_id, ese número se resuelve contra la tabla de la otra base: con
+    // los ids solapados —las dos empiezan en 1— alcanza con entrar a una para
+    // quedar autenticado en la otra, con el rol que tenga ese id allá.
+    // Verificado: un usuario de rol 'consulta' pasaba a administrador.
+    session_name('EDIFICIOSESS_' . substr(sha1(__DIR__), 0, 8));
     session_set_cookie_params([
         'lifetime' => 0,          // dura lo que dure el navegador abierto
         'path'     => '/',
