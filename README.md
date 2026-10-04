@@ -69,13 +69,20 @@ edificio/
 
 1. Abrí XAMPP y arrancá Apache y MySQL
 2. Entrá a **http://localhost/edificio/instalar.php**
-3. Completá los datos de MySQL (host, nombre de la base, usuario y contraseña) y,
-   si querés, los del correo
-4. Apretá *Instalar*
+3. Completá los datos de MySQL (host, nombre de la base, usuario y contraseña)
+4. Elegí usuario y contraseña del administrador del sistema. Si lo dejás vacío,
+   la app te lo va a pedir la primera vez que entres
+5. Si querés, completá los datos del correo
+6. Apretá *Instalar*
 
-El instalador crea la base si no existe, aplica las migraciones y escribe el
-`.env` por vos. Si la base ya existe, la reutiliza y solo aplica lo que falte:
-**no borra datos**.
+El instalador crea la base si no existe, aplica las migraciones, da de alta al
+administrador y escribe el `.env` por vos. Si la base ya existe, la reutiliza y
+solo aplica lo que falte: **no borra datos**.
+
+El usuario de MySQL que indiques tiene que poder crear bases, o la base ya tiene
+que existir. Lo que el instalador **no** hace es crear la cuenta de MySQL: esa
+se crea antes, a mano, y conviene darle permisos solo sobre su propia base
+(`GRANT ALL PRIVILEGES ON tubase.* ...`, no `ON *.*`).
 
 Cuando termina, borrá `instalar.php` del servidor. Mientras exista un `.env` el
 instalador se niega a correr, pero lo prolijo es que un script que crea bases y

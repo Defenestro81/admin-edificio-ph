@@ -77,6 +77,31 @@ if (!$yaInstalado && $_SERVER['REQUEST_METHOD'] === 'POST') {
     // Si no se completó el remitente, se usa la misma cuenta que autentica
     if ($datos['MAIL_FROM'] === '') $datos['MAIL_FROM'] = $datos['MAIL_USER'];
 
+    // ── Usuario administrador (opcional) ──
+    // Si se completa, el instalador lo crea y el sistema queda listo para
+    // entrar. Si se deja vacío, la app muestra la pantalla de alta del primer
+    // usuario, que es como funcionaba antes y sigue estando.
+    $admin = [
+        'usuario' => trim($_POST['admin_usuario'] ?? ''),
+        'nombre'  => trim($_POST['admin_nombre']  ?? ''),
+        'pass'    =>      $_POST['admin_pass']    ?? '',
+        'pass2'   =>      $_POST['admin_pass2']   ?? '',
+    ];
+    $quiereAdmin = ($admin['usuario'] . $admin['nombre'] . $admin['pass']) !== '';
+
+    // Acá solo se validan las reglas propias del formulario. El formato del
+    // usuario y el largo de la contraseña los decide crearUsuario(), que es la
+    // misma función que usa la app: duplicar esas reglas acá las dejaría
+    // desincronizadas en cuanto una cambie. El formulario las anticipa con
+    // pattern y minlength para que el navegador avise antes de enviar.
+    if ($quiereAdmin) {
+        if ($admin['usuario'] === '' || $admin['nombre'] === '' || $admin['pass'] === '') {
+            $errores[] = 'Para crear el administrador hay que completar usuario, nombre y contraseña, o dejar los tres vacíos.';
+        } elseif ($admin['pass'] !== $admin['pass2']) {
+            $errores[] = 'Las dos contraseñas del administrador no coinciden.';
+        }
+    }
+
     if (!$errores && !is_writable(__DIR__)) {
         $errores[] = 'El directorio del proyecto no tiene permiso de escritura: no se puede crear el .env.';
     }
@@ -119,11 +144,27 @@ if (!$yaInstalado && $_SERVER['REQUEST_METHOD'] === 'POST') {
             // tiene efecto y chmod devuelve false sin romper nada.
             @chmod(ENV_PATH, 0600);
 
+            // El administrador se crea reusando crearUsuario(), la misma que
+            // usa la app, para que la validación y el hasheo vivan en un solo
+            // lugar. Hace falta config.php, que recién ahora tiene un .env que
+            // leer: por eso este paso va después de escribirlo y no antes.
+            $adminCreado = null;
+            if ($quiereAdmin) {
+                require_once __DIR__ . '/includes/config.php';
+                $r = crearUsuario($admin['usuario'], $admin['pass'], $admin['nombre']);
+                // Si el alta falla, la instalación igual quedó bien: la base y
+                // el .env están. No se aborta, se informa, y el usuario se
+                // puede crear desde la app.
+                $adminCreado = $r['ok'] ? true : $r['error'];
+            }
+
             $resultado = [
                 'base_creada' => !$existia,
                 'base'        => $datos['DB_NAME'],
                 'migraciones' => $corridas,
                 'total'       => count(migraciones()),
+                'admin'       => $adminCreado,
+                'admin_usuario' => $admin['usuario'],
             ];
 
         } catch (PDOException $e) {
@@ -241,13 +282,29 @@ function viejo(string $campo, string $default = ''): string {
       </div>
     <?php endif ?>
 
+    <?php if ($resultado['admin'] === true): ?>
+      <div class="alert alert-success" style="margin-top:16px">
+        Administrador <strong><?= h($resultado['admin_usuario']) ?></strong> creado.
+        Ya podés iniciar sesión.
+      </div>
+    <?php elseif (is_string($resultado['admin'])): ?>
+      <div class="alert alert-warning" style="margin-top:16px">
+        La base quedó instalada, pero <strong>no se pudo crear el administrador</strong>:
+        <?= h($resultado['admin']) ?>.<br>
+        No es grave: crealo desde la app, que al no haber usuarios te va a mostrar
+        la pantalla de alta.
+      </div>
+    <?php endif ?>
+
     <div class="alert alert-warning" style="margin-top:20px">
       <strong>Último paso:</strong> borrá <strong>instalar.php</strong> del servidor.
       Mientras exista el <code>.env</code> el instalador no corre, pero lo prolijo es
       que no quede un script de instalación accesible.
     </div>
 
-    <a class="btn btn-primary btn-lg" href="index.html">Entrar y crear el primer usuario</a>
+    <a class="btn btn-primary btn-lg" href="index.html">
+      <?= $resultado['admin'] === true ? 'Iniciar sesión' : 'Entrar y crear el primer usuario' ?>
+    </a>
   </div>
 
 <?php else: ?>
@@ -289,7 +346,42 @@ function viejo(string $campo, string $default = ''): string {
       </div>
     </div>
 
-    <div class="paso">2 — Envío de correo (se puede completar después)</div>
+    <div class="paso">2 — Usuario administrador (se puede crear después)</div>
+    <div class="card">
+      <p style="color:var(--text2);font-size:13px;line-height:1.7;margin-bottom:20px">
+        El primer usuario del sistema, con permisos para todo. Si lo dejás vacío,
+        la app te va a pedir que lo crees la primera vez que entres.
+      </p>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label" for="admin_usuario">Usuario</label>
+          <input class="form-control" id="admin_usuario" name="admin_usuario"
+                 value="<?= viejo('admin_usuario') ?>" autocomplete="off"
+                 pattern="[a-zA-Z0-9._\-]{3,50}"
+                 title="Entre 3 y 50 caracteres: letras, números, punto, guion o guion bajo">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="admin_nombre">Nombre y apellido</label>
+          <input class="form-control" id="admin_nombre" name="admin_nombre"
+                 value="<?= viejo('admin_nombre') ?>">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="admin_pass">Contraseña</label>
+          <input class="form-control" id="admin_pass" name="admin_pass" type="password"
+                 autocomplete="new-password" minlength="8">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="admin_pass2">Repetir contraseña</label>
+          <input class="form-control" id="admin_pass2" name="admin_pass2" type="password"
+                 autocomplete="new-password" minlength="8">
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace">
+        Mínimo 8 caracteres. Se guarda hasheada con bcrypt, nunca en claro.
+      </div>
+    </div>
+
+    <div class="paso">3 — Envío de correo (se puede completar después)</div>
     <div class="card">
       <p style="color:var(--text2);font-size:13px;line-height:1.7;margin-bottom:20px">
         Para mandar las expensas por mail. Si lo dejás vacío, el sistema funciona

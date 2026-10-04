@@ -67,18 +67,31 @@ FLUSH PRIVILEGES;
 > MySQL acepta dar permisos sobre una base que todavía no se creó. Si vas a usar
 > otro nombre de base, cambialo también acá.
 
+> **Fijate que dice `edificio.*` y no `*.*`.** Con `ON *.*` esta cuenta podría
+> leer y borrar cualquier base del servidor, y como sus credenciales quedan en el
+> `.env`, cualquier filtración de ese archivo alcanzaría a todo MySQL en lugar de
+> a una sola base. Si además le agregás `WITH GRANT OPTION`, podría crear
+> usuarios: no hace falta para nada acá.
+
 ### 2.3 Ejecutar el instalador
 
 1. Abrí `http://localhost/edificio/instalar.php`
 2. Completá los datos de MySQL: host, nombre de la base, y el usuario y la
    contraseña del paso anterior
-3. Si ya tenés la cuenta de Gmail con su contraseña de aplicación (sección 2.6),
+3. Elegí el **usuario administrador** del sistema: usuario, nombre y contraseña
+   (mínimo 8 caracteres). Podés dejarlo vacío y crearlo después desde la app
+4. Si ya tenés la cuenta de Gmail con su contraseña de aplicación (sección 2.6),
    completá también esos campos; si no, dejalos vacíos y cargalos después
-4. Apretá **Instalar**
+5. Apretá **Instalar**
 
-El instalador crea la base si no existe, arma todas las tablas y escribe el
-`.env` con las credenciales. Si la base ya existe la reutiliza y aplica solo lo
-que falte: **no borra datos**.
+El instalador crea la base si no existe, arma todas las tablas, da de alta al
+administrador y escribe el `.env` con las credenciales. Si la base ya existe la
+reutiliza y aplica solo lo que falte: **no borra datos**.
+
+La contraseña del administrador se guarda hasheada con bcrypt, nunca en claro, y
+la valida la misma función que usa la app. Si no cumple el mínimo, el instalador
+completa la instalación igual y te avisa que el usuario no se creó: lo das de
+alta desde la app, sin reinstalar nada.
 
 > **Cuando termina, borrá `instalar.php`.** Mientras exista un `.env` el
 > instalador se niega a correr, pero un script que crea bases y escribe
@@ -89,10 +102,14 @@ construye `includes/migraciones.php` aplicando versiones en orden, y es lo únic
 que sabe cómo tiene que quedar la base. Un volcado suelto se desactualiza y deja
 la base a medias, que es justamente lo que el motor de migraciones evita.
 
-### 2.4 Crear el primer usuario
+### 2.4 Crear el primer usuario (si no lo hiciste en el instalador)
 
-Entrá a `http://localhost/edificio`. La primera vez el sistema no tiene usuarios
-y muestra una pantalla para crear el primero, que queda como **administrador**.
+Entrá a `http://localhost/edificio`. Si ya creaste el administrador en el paso
+anterior, te aparece directamente la pantalla de ingreso y podés saltear esta
+sección.
+
+Si lo dejaste vacío, el sistema no tiene usuarios y muestra una pantalla para
+crear el primero, que queda como **administrador**.
 
 Esa pantalla se cierra sola en cuanto existe un usuario, así que no se puede
 usar dos veces para entrar sin permiso.
