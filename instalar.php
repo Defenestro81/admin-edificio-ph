@@ -40,6 +40,12 @@ if (!$yaInstalado && $_SERVER['REQUEST_METHOD'] === 'POST') {
         'MAIL_PASS'      =>      $_POST['mail_pass']      ?? '',
         'MAIL_FROM'      => trim($_POST['mail_from']      ?? ''),
         'MAIL_FROM_NAME' => trim($_POST['mail_from_name'] ?? 'Administración del Edificio'),
+
+        // Nombre de la cookie de sesión, propio de esta instalación. Se genera
+        // al azar y no se pregunta en el formulario: es un detalle técnico, y
+        // dejarlo a elección solo abre la puerta a que dos instalaciones del
+        // mismo servidor terminen con el mismo nombre y compartan la sesión.
+        'SESSION_NAME'   => 'EDIFICIOSESS_' . bin2hex(random_bytes(8)),
     ];
 
     // ── Validación ──
