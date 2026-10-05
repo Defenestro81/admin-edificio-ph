@@ -201,3 +201,73 @@ Desde la sección **Sistema → Backup** de la app podés:
 - **Restaurar** subiendo un archivo `.sql` previamente exportado. Esta operación reemplaza todos los datos actuales.
 
 ¡Listo!
+
+---
+
+## 9. Varios edificios en el mismo servidor
+
+Cada edificio es una instalación completa e independiente: su carpeta, su base
+de datos, sus usuarios, su foto y su nombre. El código es el mismo y no se
+configura por archivo, así que alcanza con repetir la instalación.
+
+Para cada edificio:
+
+1. **Copiá el proyecto a su propia carpeta** dentro de `htdocs`, con un nombre
+   que lo identifique:
+   ```
+   C:\xampp\htdocs\edificio-rivadavia\
+   C:\xampp\htdocs\edificio-belgrano\
+   ```
+   Podés clonar el repositorio de nuevo o copiar la carpeta, pero **sin el
+   `.env`**: cada instancia necesita el suyo, y el instalador lo crea.
+
+2. **Creá su base y su propia cuenta de MySQL.** En phpMyAdmin → SQL:
+   ```sql
+   CREATE DATABASE edificio_rivadavia CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   CREATE USER 'ed_rivadavia'@'localhost' IDENTIFIED BY 'una_clave_distinta';
+   GRANT ALL PRIVILEGES ON edificio_rivadavia.* TO 'ed_rivadavia'@'localhost';
+   FLUSH PRIVILEGES;
+   ```
+   Una cuenta por edificio, cada una limitada a su base. Si compartieras una
+   sola cuenta con permiso sobre todas, el `.env` de un edificio alcanzaría para
+   leer y borrar los datos de los demás.
+
+3. **Entrá a `http://localhost/edificio-rivadavia/instalar.php`**, cargá esos
+   datos y el administrador de ese edificio.
+
+4. **Borrá `instalar.php`** de esa carpeta.
+
+Eso es todo. Cada instancia queda en su URL:
+`http://localhost/edificio-rivadavia` y `http://localhost/edificio-belgrano`.
+
+### Qué queda separado
+
+| | separado por |
+|---|---|
+| Datos (unidades, caja, liquidaciones) | su base de datos |
+| Usuarios y contraseñas | su base de datos |
+| Nombre, dirección y foto del edificio | su base de datos (tabla `edificio`) |
+| Credenciales y cuenta de correo | su `.env` |
+| Imágenes subidas | su carpeta `uploads/` |
+| **Sesión de login** | su `SESSION_NAME` |
+
+### Sobre la sesión
+
+`instalar.php` genera un `SESSION_NAME` al azar para cada instalación y lo
+escribe en el `.env`. Es el nombre de la cookie, y **tiene que ser distinto en
+cada instancia**.
+
+No es un detalle cosmético. Si dos instancias comparten el nombre, comparten la
+sesión: entrar a una deja autenticado en la otra, con el rol que tenga ese mismo
+id de usuario allá. Como las dos numeran los usuarios desde 1, el solape es lo
+normal, y un usuario de solo lectura de un edificio puede terminar
+administrando otro.
+
+Por eso, **si copiás una carpeta ya instalada en lugar de instalar de nuevo,
+borrá el `.env` y volvé a correr el instalador.** Copiar el `.env` se lleva el
+`SESSION_NAME` —y además apunta a la base del otro edificio—.
+
+Si el `.env` no tiene `SESSION_NAME`, el sistema deriva uno de la ruta de
+instalación, que también es distinto por carpeta. Sirve, pero cambia si movés
+la carpeta de lugar y cierra las sesiones abiertas.
+
