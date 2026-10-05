@@ -203,6 +203,11 @@ function generarEnv(array $d): string {
     $out .= "# Este archivo tiene credenciales y no se sube al repositorio.\n\n";
     $out .= "# ─── Base de datos MySQL ───\n";
     foreach (['DB_HOST', 'DB_USER', 'DB_PASS', 'DB_NAME'] as $k) $out .= $linea($k, $d[$k]);
+    $out .= "\n# ─── Sesión ───\n";
+    $out .= "# Propio de esta instalación: es el nombre de la cookie. Dos\n";
+    $out .= "# instancias en el mismo servidor necesitan nombres distintos, o\n";
+    $out .= "# comparten la sesión entre sí.\n";
+    $out .= $linea('SESSION_NAME', $d['SESSION_NAME']);
     $out .= "\n# ─── Gmail / SMTP para envío de expensas ───\n";
     foreach (['MAIL_HOST', 'MAIL_PORT', 'MAIL_USER', 'MAIL_PASS', 'MAIL_FROM', 'MAIL_FROM_NAME'] as $k) {
         $out .= $linea($k, $d[$k]);

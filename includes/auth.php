@@ -79,15 +79,25 @@ function sesionIniciar(): void {
     $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
           || (($_SERVER['SERVER_PORT'] ?? null) == 443);
 
-    // El nombre de la cookie incluye un sufijo derivado de la ruta de
-    // instalación. Sin esto, dos instancias en el mismo host (por ejemplo
-    // localhost/edificio y localhost/otro) comparten una sola cookie llamada
-    // EDIFICIOSESS en ruta "/", y como la sesión guarda únicamente el
-    // usuario_id, ese número se resuelve contra la tabla de la otra base: con
+    // El nombre de la cookie es propio de cada instalación: el instalador
+    // genera SESSION_NAME al azar y lo deja en el .env.
+    //
+    // Sin esto, dos instancias en el mismo host comparten una sola cookie
+    // llamada igual en ruta "/", y como la sesión guarda únicamente el
+    // usuario_id, ese número se resuelve contra la tabla de la otra base. Con
     // los ids solapados —las dos empiezan en 1— alcanza con entrar a una para
     // quedar autenticado en la otra, con el rol que tenga ese id allá.
     // Verificado: un usuario de rol 'consulta' pasaba a administrador.
-    session_name('EDIFICIOSESS_' . substr(sha1(__DIR__), 0, 8));
+    //
+    // Si la clave falta o no es válida como nombre de sesión (un .env escrito
+    // a mano, o una instalación anterior a que esto existiera) se cae a un
+    // valor derivado de la ruta. Cumple lo mismo mientras la carpeta no se
+    // mueva, y nunca deja el nombre compartido.
+    $nombreSesion = (string) env('SESSION_NAME', '');
+    if (!preg_match('/^[A-Za-z][A-Za-z0-9_]{0,63}$/', $nombreSesion)) {
+        $nombreSesion = 'EDIFICIOSESS_' . substr(sha1(__DIR__), 0, 8);
+    }
+    session_name($nombreSesion);
     session_set_cookie_params([
         'lifetime' => 0,          // dura lo que dure el navegador abierto
         'path'     => '/',
