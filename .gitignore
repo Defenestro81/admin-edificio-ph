@@ -1,0 +1,48 @@
+# ─── Credenciales (nunca al repositorio) ───
+.env
+.env.local
+
+# ─── Archivos subidos desde la app (foto del edificio) ───
+# Identifican la propiedad real. Se conserva la estructura del directorio y su
+# .htaccess, no el contenido.
+uploads/**
+!uploads/.htaccess
+!uploads/edificio/
+!uploads/edificio/.gitkeep
+
+# ─── Iconos: ojo con esto ───
+# Los favicon*, apple-touch-icon.png y web-app-manifest-*.png SÍ se publican:
+# son el logo genérico de la administración, que no identifica ningún edificio
+# en particular. Por eso no están listados acá.
+#
+# Antes eran fotos de la fachada del edificio real, que revelaban su ubicación,
+# y estaban ignorados por ese motivo. Nunca vuelvas a poner una foto del
+# edificio con estos nombres: como ahora son archivos versionados, el
+# .gitignore ya no los frena y un "git add" los publicaría. El historial de un
+# repositorio público no se puede deshacer.
+#
+# La foto del edificio que sí se usa va por la app (Sistema → Configuración) y
+# termina en uploads/, que está ignorado arriba.
+
+# ─── Agentes de Claude Code ───
+# Definiciones de trabajo propias, no hacen falta para que el sistema funcione.
+.claude/
+
+# ─── Volcados de la base: contienen datos personales de los propietarios ───
+# Ningún .sql se publica. El esquema no vive en un dump: lo construye
+# includes/migraciones.php, que sí está versionado.
+*.sql
+*.sql.gz
+
+# ─── Logs y temporales ───
+*.log
+*.tmp
+*.bak
+*~
+
+# ─── Sistema operativo / editores ───
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
