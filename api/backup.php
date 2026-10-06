@@ -56,6 +56,18 @@ function exportar(): void {
 
     $out .= "SET FOREIGN_KEY_CHECKS=1;\n";
 
+    // Queda registrado para poder avisar cuando pase demasiado tiempo sin una
+    // copia. Se reescribe actualizado_en con su propio valor porque la columna
+    // es ON UPDATE CURRENT_TIMESTAMP y, si no, bajar un backup parecería una
+    // modificación de los datos del edificio.
+    try {
+        $db->exec('UPDATE edificio SET ultimo_backup = NOW(), actualizado_en = actualizado_en WHERE id = 1');
+    } catch (PDOException $e) {
+        // Si la columna todavía no existe (migración 007 sin aplicar), no es
+        // motivo para no entregar el backup.
+        error_log('No se pudo registrar la fecha de backup: ' . $e->getMessage());
+    }
+
     $nombre = 'edificio_backup_' . date('Ymd_His') . '.sql';
     header('Content-Type: application/octet-stream');
     header('Content-Disposition: attachment; filename="' . $nombre . '"');

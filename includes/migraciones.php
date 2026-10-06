@@ -329,6 +329,22 @@ function migraciones(): array {
             ],
         ],
 
+        // ── 007 — Fecha del último backup ──────────────────────────
+        [
+            'version' => '007',
+            'nombre'  => 'Fecha del último backup',
+            'sql'     => [
+                // Para avisar cuando hace mucho que no se baja una copia. Va
+                // en 'edificio' porque es una fila única por instalación, igual
+                // que el resto de la configuración.
+                function (PDO $db): void {
+                    if (!columnaExiste($db, 'edificio', 'ultimo_backup')) {
+                        $db->exec('ALTER TABLE edificio ADD COLUMN ultimo_backup DATETIME NULL');
+                    }
+                },
+            ],
+        ],
+
     ];
 }
 
@@ -443,6 +459,9 @@ function migracionAplicadaEnEsquema(PDO $db, string $version): ?bool {
         case '006':
             return tablaExiste($db, 'intentos_login')
                 && tablaExiste($db, 'bloqueos_acceso');
+
+        case '007':
+            return columnaExiste($db, 'edificio', 'ultimo_backup');
     }
 
     return null;

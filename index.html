@@ -127,6 +127,15 @@
                 onclick="aplicarMigraciones()">Actualizar ahora</button>
       </div>
 
+      <!-- Aviso de backup atrasado. Lo puebla revisarBackup(), solo para
+           administradores: bajar la copia requiere rol admin. -->
+      <div id="aviso-backup" class="alert alert-warning solo-admin" hidden>
+        <strong>Hace falta un backup.</strong>
+        <span id="aviso-backup-detalle"></span>
+        <button class="btn btn-secondary btn-sm" style="margin-left:10px"
+                onclick="navigate('backup')">Ir a Backup</button>
+      </div>
+
       <!-- DASHBOARD -->
       <div id="page-dashboard" class="page active">
         <div class="grid-3" style="margin-bottom:24px">
@@ -2273,6 +2282,16 @@ function exportarCuentaCorrienteUnidad() {
 // ── Backup ──
 function exportBackup() {
   window.open('api/backup.php', '_blank');
+
+  // El endpoint deja registrada la fecha, pero la copia que tiene el navegador
+  // es la de cuando arrancó la app. Se vuelve a pedir para que el aviso
+  // desaparezca sin recargar la pagina.
+  setTimeout(async () => {
+    try {
+      edificio = await api('edificio.php');
+      revisarBackup();
+    } catch (e) { /* el aviso se actualiza en el proximo ingreso */ }
+  }, 1500);
 }
 
 let backupFile = null;
@@ -2377,6 +2396,41 @@ async function revisarMigraciones() {
   }
 }
 
+/**
+ * Avisa si hace demasiado que no se baja una copia. La fecha la registra
+ * api/backup.php al exportar, y viaja en los datos del edificio, que la app ya
+ * pide al arrancar: no hace falta una consulta aparte.
+ */
+const BACKUP_AVISO_DIAS = 7;
+
+function revisarBackup() {
+  const aviso = document.getElementById('aviso-backup');
+  if (!esAdmin() || !edificio) { aviso.hidden = true; return; }
+
+  const ultimo = edificio.ultimo_backup;   // 'YYYY-MM-DD HH:MM:SS' u null
+
+  if (!ultimo) {
+    document.getElementById('aviso-backup-detalle').textContent =
+      ' Todavía no se bajó ninguna copia de la base desde el sistema.';
+    aviso.hidden = false;
+    return;
+  }
+
+  // Se parsea a mano: 'YYYY-MM-DD HH:MM:SS' sin zona lo interpretan distinto
+  // los navegadores, y acá la fecha viene en hora local del servidor.
+  const [f, h] = ultimo.split(' ');
+  const [a, m, d] = f.split('-').map(Number);
+  const [hh, mm, ss] = (h || '00:00:00').split(':').map(Number);
+  const fecha = new Date(a, m - 1, d, hh, mm, ss);
+
+  const dias = Math.floor((Date.now() - fecha.getTime()) / 86400000);
+  if (dias < BACKUP_AVISO_DIAS) { aviso.hidden = true; return; }
+
+  document.getElementById('aviso-backup-detalle').textContent =
+    ` La última fue hace ${dias} ${dias === 1 ? 'día' : 'días'}, el ${d}/${m}/${a}.`;
+  aviso.hidden = false;
+}
+
 async function aplicarMigraciones() {
   if (!confirm('Se van a aplicar los cambios pendientes en la estructura de la base.\n\nConviene tener un backup reciente antes de seguir.\n\n¿Continuar?')) return;
 
@@ -2407,6 +2461,7 @@ async function iniciarApp() {
 
   renderDashboard();
   revisarMigraciones();
+  revisarBackup();
 }
 
 /** Decide qué mostrar al abrir la página: alta inicial, login o la app. */
